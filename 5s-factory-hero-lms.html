@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="description" content="5S Factory Hero — Simulasi Audit 5S Interaktif untuk LMS">
+<title>5S Factory Hero — Audit Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* ── ROOT TOKENS ─────────────────────────────── */
+:root{
+  --navy:#1C2B3A; --navy2:#253545; --navy3:#0e1820;
+  --orange:#F5A623; --orange2:#E09010;
+  --green:#28A745;  --red:#DC3545;   --indigo:#4338ca;
+  --teal:#0d9488;
+  --fh:'Oswald',sans-serif; --fb:'Nunito',sans-serif;
+  --radius:1rem; --shadow:0 4px 24px rgba(0,0,0,.12);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:var(--fb);background:#EEF1F5}
+.fh{font-family:var(--fh)!important}
+
+/* ── LAYOUT ──────────────────────────────────── */
+#root{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;transition:opacity .3s}
+.screen.hidden{opacity:0;pointer-events:none}
+
+/* ── CARDS & DRAG ────────────────────────────── */
+.item-card{cursor:grab;transition:transform .15s,box-shadow .15s;touch-action:none;user-select:none}
+.item-card:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 8px 22px rgba(0,0,0,.2)}
+.item-card.dragging{opacity:.35;transform:scale(.9);cursor:grabbing}
+
+/* ── FLIP CARDS ──────────────────────────────── */
+.perspective{perspective:1000px}
+.flip-inner{transition:transform .5s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;position:relative;width:100%;height:100%}
+.flipped .flip-inner{transform:rotateY(180deg)}
+.flip-front,.flip-back{position:absolute;inset:0;backface-visibility:hidden;border-radius:.75rem;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.flip-back{transform:rotateY(180deg)}
+.card-matched{opacity:.45!important;pointer-events:none!important}
+
+/* ── THROWABLE ───────────────────────────────── */
+.throwable{position:absolute;cursor:grab;z-index:40;touch-action:none;user-select:none}
+.trash-bin{transition:transform .15s,filter .15s;cursor:default}
+.trash-bin.hit{transform:scale(1.18) translateY(-8px);filter:drop-shadow(0 0 12px #F5A623)}
+
+/* ── LEVEL-4 ITEMS ───────────────────────────── */
+.l4-item{position:absolute;cursor:crosshair;z-index:20;display:flex;flex-direction:column;align-items:center;transition:opacity .35s;-webkit-tap-highlight-color:transparent}
+.l4-item:hover .l4-icon{transform:scale(1.2);filter:drop-shadow(0 0 8px rgba(245,166,35,.9))}
+.l4-item.found{opacity:0!important;pointer-events:none}
+.l4-icon{display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.15);transition:transform .18s}
+.l4-label{font-size:8px;font-weight:800;font-family:var(--fh);background:rgba(20,30,40,.9);color:#fff;padding:1px 6px;border-radius:3px;white-space:nowrap;margin-top:2px;opacity:0;transition:opacity .2s;pointer-events:none}
+.l4-item:hover .l4-label{opacity:1}
+.l4-item.trap-flash{animation:tflash .55s ease}
+.l4-item.hint-glow .l4-icon{animation:hpulse .75s ease-out 3}
+.fog-overlay{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 26%,rgba(12,18,28,.65) 100%);pointer-events:none;z-index:15}
+
+/* ── HINT GLOWS ──────────────────────────────── */
+@keyframes hCard{0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,0)}50%{box-shadow:0 0 0 6px rgba(245,166,35,.9),0 0 24px rgba(245,166,35,.5)}}
+@keyframes hZone{0%,100%{border-color:inherit;box-shadow:none}50%{border-color:#F5A623!important;box-shadow:inset 0 0 32px rgba(245,166,35,.28)}}
+@keyframes hBin{0%,100%{transform:scale(1);filter:none}50%{transform:scale(1.12);filter:drop-shadow(0 0 20px #F5A623)}}
+@keyframes hChoice{0%,100%{border-color:inherit;box-shadow:none}50%{border-color:#F5A623!important;box-shadow:0 0 0 4px rgba(245,166,35,.75),0 0 20px rgba(245,166,35,.4)}}
+.hint-card{animation:hCard .8s ease-out 3!important}
+.hint-zone{animation:hZone .8s ease-out 3!important}
+.hint-bin{animation:hBin .8s ease-out 3!important}
+.hint-choice{animation:hChoice .8s ease-out 3!important}
+
+/* ── DRIFT ANIMATIONS (L4 office) ────────────── */
+@keyframes d1{0%,100%{transform:translate(0,0)}25%{transform:translate(14px,-10px)}75%{transform:translate(-10px,12px)}}
+@keyframes d2{0%,100%{transform:translate(0,0)}33%{transform:translate(-14px,9px)}66%{transform:translate(11px,-12px)}}
+@keyframes d3{0%,100%{transform:translate(0,0)}20%{transform:translate(9px,14px)}60%{transform:translate(-12px,-8px)}80%{transform:translate(10px,6px)}}
+@keyframes d4{0%,100%{transform:translate(0,0)}40%{transform:translate(-16px,7px)}80%{transform:translate(13px,-11px)}}
+
+/* ── MISC ANIMATIONS ─────────────────────────── */
+@keyframes tflash{0%{filter:none}40%{filter:drop-shadow(0 0 14px #DC3545);transform:scale(1.3)}100%{filter:none;transform:scale(1)}}
+@keyframes hpulse{0%{filter:none;transform:scale(1)}50%{filter:drop-shadow(0 0 20px gold);transform:scale(1.38)}100%{filter:none;transform:scale(1)}}
+@keyframes popIn{0%{transform:scale(.35) rotate(-4deg);opacity:0}65%{transform:scale(1.1)}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.8)}}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(3px)}30%,50%,70%{transform:translateX(-5px)}40%,60%{transform:translateX(5px)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes heartBrk{0%{transform:scale(1)}50%{transform:scale(1.3) rotate(-12deg)}100%{transform:scale(.6) rotate(20deg);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes timerWarn{0%,100%{background:#b91c1c}50%{background:#dc2626}}
+@keyframes badgeDrop{0%{transform:translateY(-20px) scale(.6);opacity:0}70%{transform:translateY(2px) scale(1.1)}100%{transform:translateY(0) scale(1);opacity:1}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+.pop-in{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) forwards}
+.score-float{position:fixed;font-family:var(--fh);font-size:18px;font-weight:700;pointer-events:none;z-index:400;animation:floatUp 1.1s ease forwards;text-shadow:0 1px 4px rgba(0,0,0,.3)}
+.animate-shake{animation:shake .4s}
+.dlg1{animation:slideUp .5s ease .15s both}
+.dlg2{animation:slideUp .5s ease .65s both}
+.dlg3{animation:slideUp .5s ease 1.1s both}
+.dlg4{animation:slideUp .5s ease 1.55s both}
+.dlg5{animation:slideUp .5s ease 1.9s both}
+.badge-drop{animation:badgeDrop .5s cubic-bezier(.34,1.56,.64,1) forwards}
+.timer-warn{animation:timerWarn 1s ease infinite}
+.shimmer-btn{background:linear-gradient(90deg,#F5A623 0%,#FFC84A 50%,#F5A623 100%);background-size:200% auto;animation:shimmer 2.5s linear infinite}
+
+/* ── L5 CHOICE BUTTONS ───────────────────────── */
+.l5-choice{cursor:pointer;text-align:left;transition:all .15s;border-width:2px;border-style:solid;border-radius:.75rem;padding:.75rem;background:white;border-color:#e2e8f0;width:100%}
+.l5-choice:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.1);border-color:#94a3b8}
+.l5-choice:disabled{cursor:default}
+.l5-choice.correct-reveal{border-color:#28A745!important;background:#f0fdf4!important}
+.l5-choice.wrong-pick{border-color:#DC3545!important;background:#fef2f2!important}
+
+/* ── PROGRESS BAR FILL ───────────────────────── */
+.prog-fill{transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* ── SCROLLABLE PANELS ───────────────────────── */
+.scroll-y{overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scroll-y::-webkit-scrollbar{width:4px}
+.scroll-y::-webkit-scrollbar-track{background:transparent}
+.scroll-y::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:4px}
+
+/* ── CERTIFICATE (result) ────────────────────── */
+.cert-border{border:3px solid;border-image:linear-gradient(135deg,#F5A623,#1C2B3A,#F5A623) 1}
+.cert-seal{background:conic-gradient(from 0deg,#F5A623,#FFF,#F5A623,#FFF,#F5A623);border-radius:50%}
+
+/* ── RESPONSIVE OVERRIDES ────────────────────── */
+@media(max-width:640px){
+  .hide-sm{display:none!important}
+  .l4-label{display:none}
+}
+@media(max-height:600px){
+  .compact-h{padding-top:.5rem!important;padding-bottom:.5rem!important}
+}
+
+/* ── LMS PRINT ───────────────────────────────── */
+@media print{
+  #game,#name-screen,#greeting-screen,#heart-overlay{display:none!important}
+  #result{position:static!important;display:block!important;background:white!important}
+  #result *{color:#000!important}
+}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- ════════════════════════════════════════════
+     SCREEN 1 · NAME INPUT
+════════════════════════════════════════════ -->
+<div id="name-screen" class="screen" style="background:linear-gradient(155deg,#0e1820 0%,#1C2B3A 60%,#1a3040 100%);align-items:center;justify-content:center;padding:1rem">
+  <div class="pop-in bg-white rounded-3xl w-full shadow-2xl overflow-hidden" style="max-width:440px">
+    <!-- Header -->
+    <div class="px-7 pt-7 pb-5 text-center" style="background:linear-gradient(135deg,#1C2B3A,#253545)">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-lg" style="background:#F5A623">
+        <svg width="46" height="46" viewBox="0 0 48 48"><rect x="4" y="29" width="40" height="15" fill="white" rx="2"/><rect x="8" y="20" width="32" height="11" fill="white" opacity=".8" rx="1"/><rect x="14" y="12" width="20" height="10" fill="white" opacity=".6" rx="1"/><rect x="10" y="33" width="4" height="7" fill="#F5A623"/><rect x="22" y="33" width="4" height="7" fill="#F5A623"/><rect x="34" y="33" width="4" height="7" fill="#F5A623"/></svg>
+      </div>
+      <h1 class="fh text-3xl font-bold text-white tracking-wide">5S FACTORY HERO</h1>
+      <p class="text-xs font-bold mt-1 tracking-widest uppercase" style="color:#F5A623">Simulasi Audit 5S Interaktif · 5 Level</p>
+      <!-- Level pills -->
+      <div class="flex flex-wrap justify-center gap-1.5 mt-3">
+        <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500 text-white">L1 SEIRI</span>
+        <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500 text-white">L2 SEITON</span>
+        <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white">L3 SEISO</span>
+        <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500 text-white">L4 SEIKETSU</span>
+        <span class="text-[9px] font-bold px-2 py-0.5 rounded-full text-white" style="background:#0d9488">L5 SHITSUKE</span>
+      </div>
+    </div>
+    <!-- Form -->
+    <div class="p-7">
+      <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Nama Lengkap Peserta</label>
+      <input id="name-inp" type="text" placeholder="Ketik nama Anda di sini..." maxlength="40"
+        style="user-select:text;-webkit-user-select:text"
+        class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 text-slate-800 font-bold text-base focus:outline-none focus:border-orange-400 transition-all"
+        onkeydown="if(event.key==='Enter')enterName()">
+      <p id="name-err" class="hidden text-xs font-bold mt-1.5" style="color:#DC3545">⚠ Mohon masukkan nama lengkap Anda terlebih dahulu.</p>
+      <button onclick="enterName()" class="shimmer-btn fh w-full font-bold py-4 rounded-2xl text-xl tracking-wide text-white mt-4 active:scale-95 transition-transform shadow-lg" style="color:#1C2B3A">
+        MASUK KE SIMULASI →
+      </button>
+      <p class="text-center text-[10px] text-slate-400 mt-3 font-medium">Skor &amp; sertifikat tersedia di akhir sesi &bull; Estimasi: 8–12 menit</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 2 · GREETING / BRIEFING
+════════════════════════════════════════════ -->
+<div id="greeting-screen" class="screen hidden scroll-y" style="background:linear-gradient(155deg,#0e1820,#1C2B3A);padding:1rem">
+  <div style="max-width:640px;margin:0 auto;width:100%;padding-bottom:2rem">
+    <!-- Top greeting -->
+    <div class="dlg1 text-center mb-4 pt-2">
+      <p id="greet-salutation" class="text-xs font-bold tracking-widest uppercase" style="color:#F5A623"></p>
+      <h2 id="greet-name" class="fh text-3xl font-bold text-white leading-tight mt-0.5"></h2>
+      <p id="greet-clock" class="text-slate-500 text-xs mt-1"></p>
+    </div>
+
+    <!-- Narasi -->
+    <div class="dlg2 rounded-2xl p-4 mb-3 flex gap-3 items-start" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)">
+      <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center" style="background:#253545">
+        <svg width="22" height="22" viewBox="0 0 40 40"><rect x="4" y="22" width="32" height="14" fill="#F5A623" rx="2"/><rect x="7" y="14" width="26" height="10" fill="#F5A623" opacity=".7" rx="1"/><rect x="11" y="8" width="18" height="8" fill="#F5A623" opacity=".5" rx="1"/><rect x="8" y="26" width="4" height="6" fill="#1C2B3A"/><rect x="18" y="26" width="4" height="6" fill="#1C2B3A"/><rect x="28" y="26" width="4" height="6" fill="#1C2B3A"/></svg>
+      </div>
+      <div><p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Latar Situasi</p><p id="greet-d1" class="text-white text-xs leading-relaxed font-medium"></p></div>
+    </div>
+
+    <!-- Dialog Direktur -->
+    <div class="dlg3 rounded-2xl p-4 mb-3 flex gap-3 items-start" style="background:rgba(220,53,69,.12);border:1px solid rgba(220,53,69,.35)">
+      <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center bg-red-800">
+        <svg width="22" height="22" viewBox="0 0 40 40"><ellipse cx="20" cy="13" rx="9" ry="10" fill="#FBBF24"/><rect x="8" y="26" width="24" height="14" fill="#374151" rx="3"/><rect x="16" y="26" width="8" height="5" fill="#FBBF24"/><rect x="13" y="30" width="4" height="10" fill="#F5A623" rx="1"/><rect x="23" y="30" width="4" height="10" fill="#F5A623" rx="1"/></svg>
+      </div>
+      <div>
+        <p class="text-[9px] font-bold text-red-400 uppercase tracking-wider mb-1">Direktur Operasional — mendesak</p>
+        <p id="greet-d2" class="text-red-100 text-xs leading-relaxed italic"></p>
+      </div>
+    </div>
+
+    <!-- Misi -->
+    <div class="dlg4 rounded-2xl p-4 mb-4 flex gap-3 items-start" style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3)">
+      <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center" style="background:#F5A623">
+        <svg width="22" height="22" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="3"/><circle cx="20" cy="20" r="8" fill="none" stroke="white" stroke-width="2"/><circle cx="20" cy="20" r="3" fill="white"/></svg>
+      </div>
+      <div>
+        <p class="text-[9px] font-bold uppercase tracking-wider mb-1" style="color:#F5A623">Misi Anda Hari Ini</p>
+        <p id="greet-d3" class="text-xs leading-relaxed font-bold" style="color:#FDE68A"></p>
+      </div>
+    </div>
+
+    <!-- Level Summary Grid -->
+    <div class="dlg5 grid grid-cols-2 gap-2 mb-4">
+      <div class="rounded-xl p-3" style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3)"><div class="flex items-center gap-2 mb-1"><span class="fh text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500 text-white">LV1</span><span class="fh font-bold text-white text-xs">SEIRI — Ringkas</span></div><p class="text-[9px] text-slate-400">Pilah 8 barang ke zona yang tepat via Drag &amp; Drop.</p></div>
+      <div class="rounded-xl p-3" style="background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3)"><div class="flex items-center gap-2 mb-1"><span class="fh text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500 text-white">LV2</span><span class="fh font-bold text-white text-xs">SEITON — Rapi</span></div><p class="text-[9px] text-slate-400">Pasangkan 8 alat dengan posisi bayangannya (16 kartu).</p></div>
+      <div class="rounded-xl p-3" style="background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3)"><div class="flex items-center gap-2 mb-1"><span class="fh text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white">LV3</span><span class="fh font-bold text-white text-xs">SEISO — Resik</span></div><p class="text-[9px] text-slate-400">Lempar 10 kotoran ke tong sampah yang benar.</p></div>
+      <div class="rounded-xl p-3" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3)"><div class="flex items-center gap-2 mb-1"><span class="fh text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500 text-white">LV4</span><span class="fh font-bold text-white text-xs">SEIKETSU — Rawat</span></div><p class="text-[9px] text-slate-400">Audit 3 area pabrik, temukan 5 item, hindari jebakan!</p></div>
+      <div class="rounded-xl p-3 col-span-2" style="background:rgba(13,148,136,.15);border:1px solid rgba(13,148,136,.45)"><div class="flex items-center gap-2 mb-1"><span class="fh text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style="background:#0d9488">LV5</span><span class="fh font-bold text-white text-xs">SHITSUKE — Rajin</span><span class="text-[9px] font-bold rounded-full px-2 py-0.5 bg-yellow-400 text-yellow-900">BARU</span></div><p class="text-[9px] text-slate-400">8 skenario situasi kerja nyata — pilih keputusan terbaik sebagai supervisor.</p></div>
+    </div>
+
+    <!-- Rules + CTA -->
+    <div class="dlg5 rounded-2xl p-3 mb-4 flex items-center gap-4 text-[10px] font-bold text-slate-400" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)">
+      <div class="flex gap-1">
+        <svg width="14" height="14" viewBox="0 0 40 40"><path d="M20 34Q6 26 6 18Q6 10 13 10Q17 10 20 14Q23 10 27 10Q34 10 34 18Q34 26 20 34Z" fill="#DC3545"/></svg>
+        <svg width="14" height="14" viewBox="0 0 40 40"><path d="M20 34Q6 26 6 18Q6 10 13 10Q17 10 20 14Q23 10 27 10Q34 10 34 18Q34 26 20 34Z" fill="#DC3545"/></svg>
+        <svg width="14" height="14" viewBox="0 0 40 40"><path d="M20 34Q6 26 6 18Q6 10 13 10Q17 10 20 14Q23 10 27 10Q34 10 34 18Q34 26 20 34Z" fill="#DC3545"/></svg>
+      </div>
+      <span>3 Nyawa · Waktu 3 menit</span>
+      <span style="color:rgba(255,255,255,.3)">|</span>
+      <span>Hint tersedia, memotong poin</span>
+      <span style="color:rgba(255,255,255,.3)">|</span>
+      <span>Skor max ~11.000+</span>
+    </div>
+
+    <div class="dlg5">
+      <button onclick="startGame()" class="shimmer-btn fh w-full font-bold py-4 rounded-2xl text-xl tracking-wide active:scale-95 transition-transform shadow-xl" style="color:#1C2B3A">
+        TERIMA TUGAS → MULAI AUDIT
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 3 · GAME
+════════════════════════════════════════════ -->
+<div id="game-screen" class="screen hidden" style="flex-direction:column;padding:.5rem;gap:.5rem;background:#EEF1F5">
+
+  <!-- ── HEADER BAR ── -->
+  <div id="hbar" class="flex items-center gap-2 rounded-2xl px-3 py-2 shadow-md flex-shrink-0" style="background:#1C2B3A">
+    <div class="rounded-xl px-3 py-1.5 flex-shrink-0" style="background:#F5A623">
+      <span id="lvl-title" class="fh font-bold text-base leading-none" style="color:#1C2B3A;white-space:nowrap">Lv1: SEIRI</span>
+    </div>
+    <div class="rounded-xl px-3 py-1.5 flex-shrink-0" style="background:#253545">
+      <span class="text-slate-500 text-[8px] font-bold uppercase block leading-none mb-0.5">Score</span>
+      <span id="score-disp" class="fh text-lg font-bold leading-none" style="color:#F5A623">0</span>
+    </div>
+    <!-- Hearts -->
+    <div id="hearts-bar" class="flex gap-0.5 rounded-xl px-2 py-1.5 flex-shrink-0" style="background:#253545"></div>
+    <!-- Spacer -->
+    <div class="flex-1"></div>
+    <!-- Hint -->
+    <button id="hint-btn" onclick="useHint()" class="rounded-xl px-3 py-1.5 flex-shrink-0 cursor-pointer transition-all active:scale-95" style="background:#312080;border:none;outline:none">
+      <span class="text-indigo-300 text-[8px] font-bold uppercase block leading-none mb-0.5">Hint −50</span>
+      <span id="hint-cnt" class="fh text-white text-sm font-bold leading-none">∞</span>
+    </button>
+    <!-- BGM Toggle -->
+    <button id="bgm-btn" onclick="toggleBGM()" class="rounded-xl px-2 py-1.5 flex-shrink-0 cursor-pointer transition-all active:scale-95" style="background:#253545;border:none;outline:none;min-width:36px" title="Toggle Musik">
+      <span class="text-slate-400 text-[7px] font-bold uppercase block leading-none mb-0.5">Musik</span>
+      <div id="bgm-icon" class="flex items-center justify-center">
+        <svg id="bgm-on-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5A623" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <svg id="bgm-off-ico" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><line x1="2" y1="2" x2="22" y2="22" stroke="#64748b" stroke-width="2"/></svg>
+      </div>
+    </button>
+    <!-- Timer -->
+    <div id="timer-box" class="rounded-xl px-4 py-1.5 text-center flex-shrink-0" style="background:#7f1d1d">
+      <span class="text-red-300 text-[8px] font-bold uppercase block leading-none mb-0.5">Waktu</span>
+      <span id="timer-disp" class="fh text-white text-xl font-bold leading-none">03:00</span>
+    </div>
+  </div>
+
+  <!-- ── PLAY AREA ── -->
+  <div class="flex-1 overflow-hidden relative rounded-2xl bg-white shadow-inner border-2 border-slate-200">
+
+    <!-- ── LEVEL 1: SEIRI ── -->
+    <div id="ui-1" class="absolute inset-0 flex gap-3 p-3">
+      <div id="l1-grid" class="scroll-y flex-1 rounded-2xl p-3 flex flex-wrap gap-2 content-start border border-slate-200" style="background:#f8fafc"></div>
+      <div class="flex flex-col gap-3 flex-shrink-0" style="width:38%">
+        <div id="drop-redtag" data-target="redtag" class="flex-1 border-4 border-dashed rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all" style="background:#fef2f2;border-color:#fca5a5">
+          <div class="w-12 h-12 rounded-full flex items-center justify-center shadow" style="background:#DC3545">
+            <svg width="26" height="26" viewBox="0 0 40 40"><rect x="6" y="14" width="28" height="20" fill="white" rx="2"/><rect x="10" y="10" width="20" height="6" fill="white" rx="1" opacity=".8"/><line x1="14" y1="19" x2="14" y2="29" stroke="#DC3545" stroke-width="2.5" stroke-linecap="round"/><line x1="20" y1="19" x2="20" y2="29" stroke="#DC3545" stroke-width="2.5" stroke-linecap="round"/><line x1="26" y1="19" x2="26" y2="29" stroke="#DC3545" stroke-width="2.5" stroke-linecap="round"/></svg>
+          </div>
+          <span class="fh font-bold text-base tracking-wide" style="color:#991b1b">RED TAG</span>
+          <span class="text-[9px] font-bold text-center px-1" style="color:#ef4444">Tidak dibutuhkan</span>
+        </div>
+        <div id="drop-essential" data-target="essential" class="flex-1 border-4 border-dashed rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all" style="background:#f0fdf4;border-color:#86efac">
+          <div class="w-12 h-12 rounded-full flex items-center justify-center shadow" style="background:#28A745">
+            <svg width="26" height="26" viewBox="0 0 40 40"><rect x="8" y="18" width="24" height="16" fill="white" rx="2"/><polygon points="8,18 20,10 32,18" fill="white" opacity=".8"/><rect x="15" y="20" width="10" height="3" fill="#28A745" rx="1"/></svg>
+          </div>
+          <span class="fh font-bold text-base tracking-wide" style="color:#166534">STAY</span>
+          <span class="text-[9px] font-bold" style="color:#16a34a">Tetap di area</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LEVEL 2: SEITON ── -->
+    <div id="ui-2" class="hidden absolute inset-0 flex flex-col p-3 gap-2" style="background:rgba(250,245,255,.5)">
+      <p class="text-center text-xs font-bold fh text-purple-600 flex-shrink-0">Cocokkan alat dengan posisi bayangan-nya — ingat setiap kartu!</p>
+      <div id="mem-grid" class="flex-1 grid gap-2" style="grid-template-columns:repeat(8,1fr)"></div>
+    </div>
+
+    <!-- ── LEVEL 3: SEISO ── -->
+    <div id="ui-3" class="hidden absolute inset-0 flex flex-col p-3 gap-2" style="background:rgba(240,253,244,.5)">
+      <div class="flex justify-around flex-shrink-0">
+        <div class="trash-bin rounded-b-2xl border-4 flex flex-col items-center justify-center shadow-inner" style="width:22%;max-width:100px;height:clamp(80px,16vw,120px);background:#fff7ed;border-color:#f97316" data-bin="organic">
+          <svg width="36" height="36" viewBox="0 0 40 40"><path d="M10 19Q10 11 20 10Q30 11 30 19Q30 29 20 33Q10 29 10 19Z" fill="#E03030"/><rect x="19" y="6" width="3" height="6" fill="#3A8030" rx="1"/><path d="M20 10Q22 4 27 6" stroke="#3A8030" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+          <span class="text-[8px] fh font-bold mt-0.5" style="color:#c2410c">ORGANIK</span>
+        </div>
+        <div class="trash-bin rounded-b-2xl border-4 flex flex-col items-center justify-center shadow-inner" style="width:22%;max-width:100px;height:clamp(80px,16vw,120px);background:#eff6ff;border-color:#3b82f6" data-bin="chemical">
+          <svg width="36" height="36" viewBox="0 0 40 40"><rect x="16" y="8" width="8" height="10" fill="#4A80C8" rx="1"/><path d="M13 18L8 32L32 32L27 18Z" fill="#3A70B8"/><ellipse cx="20" cy="29" rx="6" ry="3" fill="#5A90D8" opacity=".5"/><rect x="16" y="6" width="8" height="4" fill="#3A70B8" rx="1"/></svg>
+          <span class="text-[8px] fh font-bold mt-0.5" style="color:#1d4ed8">KIMIA</span>
+        </div>
+        <div class="trash-bin rounded-b-2xl border-4 flex flex-col items-center justify-center shadow-inner" style="width:22%;max-width:100px;height:clamp(80px,16vw,120px);background:#f8fafc;border-color:#64748b" data-bin="dust">
+          <svg width="36" height="36" viewBox="0 0 40 40"><path d="M8 14L12 10L28 10L32 14L30 32L10 32Z" fill="#A09090"/><rect x="14" y="8" width="12" height="4" fill="#808080"/><line x1="16" y1="14" x2="15" y2="30" stroke="#C0B0B0" stroke-width="1.5"/><line x1="20" y1="14" x2="20" y2="30" stroke="#C0B0B0" stroke-width="1.5"/><line x1="24" y1="14" x2="25" y2="30" stroke="#C0B0B0" stroke-width="1.5"/></svg>
+          <span class="text-[8px] fh font-bold mt-0.5" style="color:#475569">DEBU</span>
+        </div>
+      </div>
+      <div class="flex-1 relative flex items-center justify-center">
+        <div id="l3-spawner" class="absolute inset-0 flex items-center justify-center"></div>
+      </div>
+      <div class="flex-shrink-0 text-right pr-2 pb-1">
+        <span class="fh text-sm font-bold rounded-full px-3 py-1 bg-white border border-emerald-200 shadow" style="color:#059669">Sisa: <span id="l3-rem">10</span></span>
+      </div>
+    </div>
+
+    <!-- ── LEVEL 4: SEIKETSU ── -->
+    <div id="ui-4" class="hidden absolute inset-0 flex flex-col">
+      <div class="flex items-center gap-2 px-3 py-2 flex-shrink-0" style="background:#312e81">
+        <span id="l4-name" class="fh font-bold text-white text-sm flex-1">AREA 1: GUDANG</span>
+        <span id="l4-counter" class="fh text-xs font-bold rounded-full px-2 py-0.5" style="background:#4338ca;color:white">0/5</span>
+        <span id="l4-stage" class="text-[9px] text-indigo-300 font-bold" style="background:#1e1b4b;padding:2px 8px;border-radius:999px">Area 1/3</span>
+      </div>
+      <div id="l4-canvas" class="flex-1 relative overflow-hidden"></div>
+      <div class="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style="background:#eef2ff;border-top:1px solid #c7d2fe">
+        <span id="l4-hint-txt" class="text-[9px] font-bold flex-1" style="color:#4338ca">Klik item tidak standar. Hindari jebakan!</span>
+        <span id="l4-diff" class="fh text-[9px] font-bold rounded-full px-2 py-0.5 bg-green-100 text-green-700">MUDAH</span>
+      </div>
+    </div>
+
+    <!-- ── LEVEL 5: SHITSUKE ── -->
+    <div id="ui-5" class="hidden absolute inset-0 flex flex-col p-3 gap-2.5 scroll-y" style="background:linear-gradient(160deg,#f0fdf4,#eff6ff)">
+      <!-- Progress -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="fh font-bold text-xs text-teal-700 flex-shrink-0">Skenario <span id="l5-num">1</span>/8</span>
+        <div class="flex-1 rounded-full h-2" style="background:#e2e8f0">
+          <div id="l5-bar" class="h-2 rounded-full prog-fill" style="width:0%;background:linear-gradient(90deg,#0d9488,#06b6d4)"></div>
+        </div>
+        <span class="fh text-xs font-bold rounded-full px-2 py-0.5 flex-shrink-0" style="background:#f0fdfa;border:1px solid #99f6e4;color:#0d9488">✓ <span id="l5-correct">0</span>/8</span>
+      </div>
+      <!-- Scenario card -->
+      <div class="bg-white rounded-2xl p-3 border-2 border-teal-200 flex items-start gap-3 shadow-sm flex-shrink-0">
+        <div id="l5-ico" class="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm" style="background:#f0fdf4"></div>
+        <div class="flex-1 min-w-0">
+          <span class="text-[8px] fh font-bold text-teal-500 uppercase tracking-wider">Situasi Kerja</span>
+          <p id="l5-text" class="text-xs font-bold text-slate-800 leading-snug mt-0.5"></p>
+          <p id="l5-q" class="text-[10px] font-bold mt-1" style="color:#0d9488"></p>
+        </div>
+      </div>
+      <!-- Choices -->
+      <div id="l5-choices" class="grid grid-cols-2 gap-2 flex-shrink-0"></div>
+      <!-- Feedback -->
+      <div id="l5-fb" class="hidden rounded-2xl p-3 border-2 flex items-start gap-2.5 flex-shrink-0">
+        <div id="l5-fb-ico" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"></div>
+        <div><p id="l5-fb-pts" class="fh font-bold text-sm leading-none"></p><p id="l5-fb-why" class="text-[10px] text-slate-600 mt-1 leading-snug"></p></div>
+      </div>
+    </div>
+
+  </div><!-- /play area -->
+
+  <!-- ── BADGE FOOTER ── -->
+  <div id="badge-row" class="flex gap-3 justify-center items-center flex-shrink-0">
+    <div id="bdg-1" class="opacity-20 grayscale transition-all text-center"><div class="w-9 h-9 rounded-full flex items-center justify-center shadow bg-blue-500"><svg width="18" height="18" viewBox="0 0 40 40"><polygon points="20,4 24,16 36,16 27,24 30,36 20,28 10,36 13,24 4,16 16,16" fill="white"/></svg></div><span class="text-[7px] fh font-bold text-slate-400 uppercase block">Seiri</span></div>
+    <div id="bdg-2" class="opacity-20 grayscale transition-all text-center"><div class="w-9 h-9 rounded-full flex items-center justify-center shadow bg-purple-500"><svg width="18" height="18" viewBox="0 0 40 40"><rect x="8" y="18" width="24" height="4" fill="white" rx="2"/><rect x="18" y="8" width="4" height="24" fill="white" rx="2"/></svg></div><span class="text-[7px] fh font-bold text-slate-400 uppercase block">Seiton</span></div>
+    <div id="bdg-3" class="opacity-20 grayscale transition-all text-center"><div class="w-9 h-9 rounded-full flex items-center justify-center shadow bg-emerald-500"><svg width="18" height="18" viewBox="0 0 40 40"><path d="M8 22Q8 10 20 8Q30 10 32 18Q34 26 20 32Q8 28 8 22Z" fill="white"/><path d="M14 20L18 24L27 15" stroke="#28A745" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="text-[7px] fh font-bold text-slate-400 uppercase block">Seiso</span></div>
+    <div id="bdg-4" class="opacity-20 grayscale transition-all text-center"><div class="w-9 h-9 rounded-full flex items-center justify-center shadow bg-indigo-600"><svg width="18" height="18" viewBox="0 0 40 40"><path d="M20 4L34 12L34 22Q34 32 20 36Q6 32 6 22L6 12Z" fill="white"/><path d="M14 20L18 24L27 15" stroke="#4338ca" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="text-[7px] fh font-bold text-slate-400 uppercase block">Seiketsu</span></div>
+    <div id="bdg-5" class="opacity-20 grayscale transition-all text-center"><div class="w-9 h-9 rounded-full flex items-center justify-center shadow" style="background:#0d9488"><svg width="18" height="18" viewBox="0 0 40 40"><circle cx="20" cy="15" r="9" fill="none" stroke="white" stroke-width="2.5"/><path d="M14 15L18 19L27 11" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="12" y="27" width="16" height="3" fill="white" rx="1.5"/><rect x="15" y="32" width="10" height="3" fill="white" rx="1.5"/></svg></div><span class="text-[7px] fh font-bold text-slate-400 uppercase block">Shitsuke</span></div>
+  </div>
+
+</div><!-- /game-screen -->
+
+<!-- ════════════════════════════════════════════
+     OVERLAY · HEART LOST
+════════════════════════════════════════════ -->
+<div id="heart-ov" class="screen hidden items-center justify-center" style="background:rgba(0,0,0,.88);z-index:200">
+  <div class="text-center pop-in">
+    <div class="flex justify-center mb-4">
+      <svg width="72" height="72" viewBox="0 0 40 40" style="animation:heartBrk .6s ease .3s both">
+        <path d="M20 34Q6 26 6 18Q6 10 13 10Q17 10 20 14Q23 10 27 10Q34 10 34 18Q34 26 20 34Z" fill="#DC3545"/>
+        <line x1="13" y1="16" x2="27" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="27" y1="16" x2="13" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h2 class="fh text-3xl font-bold text-white mb-2">NYAWA BERKURANG!</h2>
+    <p class="font-bold text-sm" style="color:#fca5a5">Sisa nyawa: <span id="ho-hearts"></span> · Waktu baru: <span id="ho-time"></span> detik</p>
+    <p class="text-slate-500 text-xs mt-2">Melanjutkan dari level saat ini...</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     MODAL · LEVEL COMPLETE
+════════════════════════════════════════════ -->
+<div id="modal" class="screen hidden items-center justify-center p-4" style="background:rgba(0,0,0,.65);z-index:180">
+  <div id="modal-box" class="bg-white rounded-3xl w-full p-7 text-center shadow-2xl border-t-8 pop-in" style="max-width:360px">
+    <div id="modal-ico" class="flex justify-center mb-3"></div>
+    <h2 id="modal-ttl" class="fh text-2xl font-bold text-slate-800 mb-1.5 tracking-wide"></h2>
+    <p id="modal-bdy" class="text-slate-500 text-xs mb-5 leading-relaxed"></p>
+    <button id="modal-btn" class="fh w-full font-bold py-3.5 rounded-2xl text-lg tracking-wide text-white active:scale-95 transition-transform shadow-lg"></button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 4 · RESULT / CERTIFICATE
+════════════════════════════════════════════ -->
+<div id="result-screen" class="screen hidden scroll-y" style="background:linear-gradient(155deg,#0e1820,#1C2B3A);align-items:center;padding:1rem;justify-content:flex-start">
+  <div style="max-width:560px;width:100%;margin:0 auto;padding-bottom:2rem">
+
+    <!-- Certificate card -->
+    <div id="cert-card" class="bg-white rounded-3xl overflow-hidden shadow-2xl w-full pop-in" style="border:3px solid rgba(245,166,35,.5)">
+
+      <!-- Certificate header -->
+      <div class="text-center px-6 pt-6 pb-4" style="background:linear-gradient(135deg,#1C2B3A 0%,#253545 100%)">
+        <div class="inline-flex gap-1 mb-2">
+          <div class="w-2 h-2 rounded-full bg-red-500"></div>
+          <div class="w-2 h-2 rounded-full" style="background:#F5A623"></div>
+          <div class="w-2 h-2 rounded-full bg-green-500"></div>
+        </div>
+        <p class="text-[9px] font-bold tracking-[.25em] uppercase mb-1" style="color:#F5A623">SERTIFIKAT PENYELESAIAN SIMULASI</p>
+        <h1 class="fh text-2xl font-bold text-white tracking-wider">5S FACTORY HERO</h1>
+        <p class="text-slate-400 text-[10px] mt-1">PT. Maju Bersama Industri · Audit Simulator v2.0</p>
+      </div>
+
+      <!-- Body -->
+      <div class="px-6 pt-4 pb-5">
+
+        <!-- Tier + name -->
+        <div class="text-center mb-4">
+          <div id="res-tier-badge" class="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-3 shadow-sm">
+            <span id="res-tier-ico" class="text-base"></span>
+            <span id="res-tier" class="fh font-bold text-sm tracking-wide"></span>
+          </div>
+          <h2 class="fh text-2xl font-bold text-slate-800" id="res-player-name"></h2>
+          <p class="text-[10px] text-slate-400 mt-0.5" id="res-timestamp"></p>
+        </div>
+
+        <!-- Stats row -->
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <div class="rounded-2xl p-2.5 text-center border" style="background:#fafafa;border-color:#e8e8e8">
+            <span class="text-[8px] text-slate-400 font-bold uppercase block">Skor Total</span>
+            <span id="final-score" class="fh text-2xl font-black" style="color:#1C2B3A">0</span>
+          </div>
+          <div class="rounded-2xl p-2.5 text-center border" style="background:#fafafa;border-color:#e8e8e8">
+            <span class="text-[8px] text-slate-400 font-bold uppercase block">Badge</span>
+            <span id="res-badge-cnt" class="fh text-2xl font-black text-indigo-600">0</span><span class="fh text-xs text-slate-400">/5</span>
+          </div>
+          <div class="rounded-2xl p-2.5 text-center border" style="background:#fafafa;border-color:#e8e8e8">
+            <span class="text-[8px] text-slate-400 font-bold uppercase block">Skenario</span>
+            <span id="res-scenario" class="fh text-2xl font-black text-teal-600">0</span><span class="fh text-xs text-slate-400">/8</span>
+          </div>
+        </div>
+
+        <!-- Badge row -->
+        <div id="res-badges" class="flex justify-center gap-2.5 mb-4"></div>
+
+        <!-- Narrative -->
+        <div id="res-narr" class="rounded-2xl p-4 mb-4 border-l-4 text-left" style="background:#f8fafc;border-color:#F5A623">
+          <p class="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2">Evaluasi Kinerja</p>
+          <div id="res-narr-body" class="text-xs text-slate-700 leading-relaxed"></div>
+        </div>
+
+        <!-- Detail stats -->
+        <div class="grid grid-cols-2 gap-2 mb-5 text-[10px]">
+          <div class="rounded-xl p-2 border" style="background:#fafafa;border-color:#e8e8e8"><span class="text-slate-400 font-bold uppercase block">Hint Digunakan</span><span id="res-hints" class="fh font-bold text-slate-700">0×</span></div>
+          <div class="rounded-xl p-2 border" style="background:#fafafa;border-color:#e8e8e8"><span class="text-slate-400 font-bold uppercase block">Nyawa Tersisa</span><div id="res-hearts" class="flex gap-1 mt-0.5"></div></div>
+          <div class="rounded-xl p-2 border" style="background:#fafafa;border-color:#e8e8e8"><span class="text-slate-400 font-bold uppercase block">Waktu Habis</span><span id="res-timeouts" class="fh font-bold text-slate-700">0×</span></div>
+          <div class="rounded-xl p-2 border" style="background:#fafafa;border-color:#e8e8e8"><span class="text-slate-400 font-bold uppercase block">Jebakan Diklik</span><span id="res-traps" class="fh font-bold text-red-600">0×</span></div>
+        </div>
+
+        <!-- LMS completion note -->
+        <div id="lms-note" class="rounded-xl p-2.5 mb-4 text-center text-[9px] font-bold" style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d">
+          ✓ Sesi ini telah tercatat. Hasil dapat diekspor untuk LMS Anda.
+        </div>
+
+        <!-- Buttons -->
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="printCert()" class="fh font-bold py-3 rounded-2xl text-sm tracking-wide active:scale-95 transition-transform border-2 border-slate-300 text-slate-700 bg-white">
+            <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Cetak / PDF
+          </button>
+          <button onclick="location.reload()" class="fh font-bold py-3 rounded-2xl text-sm tracking-wide text-white active:scale-95 transition-transform shadow-lg" style="background:#1C2B3A">
+            Ulangi Simulasi
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="hidden" style="position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:500;pointer-events:none">
+  <div id="toast-inner" class="fh font-bold text-white text-sm px-5 py-2 rounded-full shadow-2xl tracking-wide" style="white-space:nowrap"></div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════ -->
+<script>
+// ══════════════════════════════════════════════
+// ICON LIBRARY — all SVG, zero emoji
+// ══════════════════════════════════════════════
+const ICO={
+  kabel:`<rect x="5" y="18" width="12" height="3" fill="#555" rx="1.5"/><rect x="23" y="18" width="12" height="3" fill="#555" rx="1.5"/><circle cx="5" cy="19.5" r="3.5" fill="#222"/><circle cx="35" cy="19.5" r="3.5" fill="#222"/><path d="M17 19.5L19 14L21 19.5L23 14L25 19.5" stroke="#E33" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="28" r="3" fill="#F90" opacity=".8"/>`,
+  plastik:`<path d="M13 11L16 31L24 31L27 11Z" fill="#5A9EDB"/><rect x="13" y="9" width="14" height="4" fill="#3A7EC0" rx="2"/><line x1="17" y1="15" x2="17" y2="27" stroke="white" stroke-width="1.2" opacity=".4"/>`,
+  cardbox:`<rect x="9" y="18" width="22" height="15" fill="#D4A060" rx="2"/><polygon points="9,18 20,12 31,18" fill="#C09050"/><line x1="9" y1="18" x2="31" y2="18" stroke="#A07030" stroke-width="1.5"/><rect x="16" y="20" width="8" height="3" fill="#A07030" rx="1"/>`,
+  gearbroke:`<circle cx="20" cy="20" r="7" fill="#909090"/><circle cx="20" cy="20" r="3" fill="#666"/><rect x="18" y="9" width="4" height="5" fill="#909090" rx="1"/><rect x="18" y="26" width="4" height="5" fill="#909090" rx="1"/><rect x="9" y="18" width="5" height="4" fill="#909090" rx="1"/><rect x="26" y="18" width="5" height="4" fill="#909090" rx="1"/><line x1="13" y1="13" x2="27" y2="27" stroke="#DC3545" stroke-width="2.8" stroke-linecap="round"/><line x1="27" y1="13" x2="13" y2="27" stroke="#DC3545" stroke-width="2.8" stroke-linecap="round"/>`,
+  pallet:`<rect x="4" y="25" width="32" height="5" fill="#9A7040" rx="1"/><rect x="4" y="17" width="32" height="4" fill="#C09A60" rx="1"/><rect x="4" y="11" width="32" height="4" fill="#C09A60" rx="1"/><rect x="4" y="11" width="5" height="14" fill="#9A7040" rx="1"/><rect x="17" y="11" width="5" height="14" fill="#9A7040" rx="1"/><rect x="31" y="11" width="5" height="14" fill="#9A7040" rx="1"/>`,
+  helmet:`<path d="M8 25Q8 11 20 11Q32 11 32 25Z" fill="#F5A623"/><rect x="6" y="23" width="28" height="5" fill="#D89010" rx="2"/><rect x="14" y="10" width="12" height="7" fill="#F8C030" rx="2"/>`,
+  koran:`<rect x="7" y="9" width="26" height="23" fill="#E8E0D0" rx="2"/><rect x="7" y="9" width="26" height="5" fill="#D0C8B8" rx="2"/><line x1="11" y1="19" x2="29" y2="19" stroke="#A09880" stroke-width="1.5"/><line x1="11" y1="22" x2="29" y2="22" stroke="#B8B0A0" stroke-width="1"/><line x1="11" y1="25" x2="23" y2="25" stroke="#B8B0A0" stroke-width="1"/>`,
+  material:`<ellipse cx="20" cy="20" rx="13" ry="9" fill="#3A9080"/><ellipse cx="20" cy="20" rx="13" ry="9" fill="none" stroke="#2A7060" stroke-width="1.5"/><ellipse cx="20" cy="20" rx="5" ry="4" fill="#2A7060"/>`,
+  hammer:`<rect x="17" y="22" width="6" height="13" fill="#8B6343" rx="1.5"/><rect x="9" y="10" width="22" height="14" fill="#A07850" rx="3"/><rect x="7" y="12" width="5" height="10" fill="#906840" rx="1"/>`,
+  wrench:`<path d="M13 34L21 20" stroke="#888" stroke-width="4" stroke-linecap="round"/><circle cx="24" cy="16" r="7" fill="none" stroke="#888" stroke-width="3"/><circle cx="24" cy="16" r="3" fill="#888"/><circle cx="13" cy="34" r="3.5" fill="#777"/>`,
+  saw:`<rect x="7" y="16" width="26" height="7" fill="#A09080" rx="1"/><rect x="5" y="14" width="5" height="11" fill="#8A7870" rx="1"/><path d="M12 23L14 27L16 23L18 27L20 23L22 27L24 23L26 27L28 23L30 27L32 23" fill="#8A7870"/>`,
+  pliers:`<path d="M15 8L19 22L21 22L25 8" stroke="#888" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="20" cy="24" rx="5" ry="3" fill="#888"/><path d="M19 22L17 33" stroke="#777" stroke-width="2.5" stroke-linecap="round"/><path d="M21 22L23 33" stroke="#777" stroke-width="2.5" stroke-linecap="round"/>`,
+  screwdriver:`<rect x="18" y="8" width="4" height="18" fill="#C09060" rx="2"/><rect x="16" y="24" width="8" height="4" fill="#888" rx="1"/><rect x="18" y="28" width="4" height="7" fill="#999" rx="1"/>`,
+  bolt:`<circle cx="20" cy="16" r="10" fill="#909090" stroke="#777" stroke-width="1.5"/><circle cx="20" cy="16" r="5" fill="#777"/><rect x="18" y="24" width="4" height="11" fill="#888" rx="1"/><path d="M15 30L20 24L25 30" fill="#777"/>`,
+  flashlight:`<rect x="14" y="12" width="12" height="18" fill="#505050" rx="3"/><circle cx="20" cy="12" r="7" fill="#666" stroke="#505050" stroke-width="1.5"/><circle cx="20" cy="12" r="4" fill="#FFE060"/><rect x="16" y="28" width="8" height="5" fill="#404040" rx="1"/><line x1="13" y1="9" x2="7" y2="5" stroke="#FFE060" stroke-width="1.5" opacity=".7"/><line x1="27" y1="9" x2="33" y2="5" stroke="#FFE060" stroke-width="1.5" opacity=".7"/>`,
+  ruler:`<rect x="5" y="15" width="30" height="11" fill="#F5C030" rx="2"/><line x1="9" y1="15" x2="9" y2="20" stroke="#C09010" stroke-width="1.5"/><line x1="13" y1="15" x2="13" y2="18" stroke="#C09010" stroke-width="1.5"/><line x1="17" y1="15" x2="17" y2="21" stroke="#C09010" stroke-width="1.5"/><line x1="21" y1="15" x2="21" y2="18" stroke="#C09010" stroke-width="1.5"/><line x1="25" y1="15" x2="25" y2="18" stroke="#C09010" stroke-width="1.5"/><line x1="29" y1="15" x2="29" y2="21" stroke="#C09010" stroke-width="1.5"/>`,
+  apple:`<path d="M10 19Q10 11 20 10Q30 11 30 19Q30 29 20 33Q10 29 10 19Z" fill="#E03030"/><rect x="19" y="6" width="3" height="6" fill="#3A8030" rx="1"/><path d="M20 10Q22 4 27 6" stroke="#3A8030" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+  oildrop:`<path d="M20 8Q26 14 26 22Q26 30 20 32Q14 30 14 22Q14 14 20 8Z" fill="#333"/><ellipse cx="16" cy="22" rx="3" ry="4" fill="#555" opacity=".5"/>`,
+  dustpile:`<ellipse cx="20" cy="27" rx="14" ry="6" fill="#B0A898"/><ellipse cx="13" cy="23" rx="8" ry="5" fill="#A09888"/><ellipse cx="27" cy="24" rx="7" ry="5" fill="#A09888"/>`,
+  banana:`<path d="M8 30Q12 10 20 8Q28 6 32 14Q28 12 20 16Q12 20 8 30Z" fill="#F5D020"/><path d="M8 30Q10 27 12 25" stroke="#D4A820" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+  flask:`<rect x="16" y="8" width="8" height="10" fill="#4A90E0" rx="1"/><path d="M13 18L8 32L32 32L27 18Z" fill="#3A80D0"/><ellipse cx="20" cy="30" rx="6" ry="3" fill="#5AA0E8" opacity=".5"/><rect x="16" y="6" width="8" height="4" fill="#3A70B8" rx="1"/>`,
+  scrap:`<path d="M10 12L18 8L30 16L28 28L12 30Z" fill="#808890"/><path d="M10 12L16 18L28 16" stroke="#606880" stroke-width="1.5" fill="none"/>`,
+  leaf:`<path d="M20 31Q8 25 8 14Q8 8 20 6Q32 8 32 14Q32 25 20 31Z" fill="#3A8030"/><line x1="20" y1="31" x2="20" y2="6" stroke="#2A6020" stroke-width="1.5"/>`,
+  lubcan:`<rect x="13" y="10" width="14" height="22" fill="#C08030" rx="3"/><rect x="15" y="8" width="10" height="5" fill="#A06020" rx="2"/><rect x="17" y="6" width="6" height="4" fill="#806010" rx="1"/>`,
+  vest:`<path d="M8 10L16 8L20 14L24 8L32 10L32 32L8 32Z" fill="#F5A623"/><path d="M16 8L20 14L24 8" fill="#E09010"/><rect x="14" y="10" width="12" height="2" fill="#FFE060" rx="1" opacity=".8"/>`,
+  boot:`<path d="M13 10L15 28L30 28L30 22L18 22L16 10Z" fill="#4A3020"/><rect x="11" y="26" width="21" height="6" fill="#3A2010" rx="2"/>`,
+  goggles:`<rect x="6" y="16" width="28" height="12" fill="#3A3A5A" rx="4"/><rect x="7" y="17" width="11" height="10" fill="#50A0D8" rx="3" opacity=".85"/><rect x="22" y="17" width="11" height="10" fill="#50A0D8" rx="3" opacity=".85"/><rect x="18" y="19" width="4" height="6" fill="#3A3A5A"/><line x1="6" y1="21" x2="2" y2="21" stroke="#3A3A5A" stroke-width="3" stroke-linecap="round"/><line x1="34" y1="21" x2="38" y2="21" stroke="#3A3A5A" stroke-width="3" stroke-linecap="round"/>`,
+  apar:`<rect x="14" y="12" width="12" height="22" fill="#DC3545" rx="3"/><rect x="16" y="8" width="8" height="6" fill="#C02030" rx="2"/><rect x="18" y="6" width="4" height="4" fill="#901820" rx="1"/><path d="M18 6Q14 4 11 2" stroke="#901820" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="15" y="20" width="10" height="3" fill="#F86070" rx="1" opacity=".6"/>`,
+  helmbroke:`<path d="M8 25Q8 11 20 11Q32 11 32 25Z" fill="#A09090"/><rect x="6" y="23" width="28" height="5" fill="#888" rx="2"/><line x1="12" y1="14" x2="22" y2="24" stroke="#DC3545" stroke-width="2.5" stroke-linecap="round"/>`,
+  oldtag:`<path d="M8 12L26 12L32 20L26 28L8 28Z" fill="#D0C890" stroke="#A0A070" stroke-width="1"/><circle cx="12" cy="20" r="2.5" fill="none" stroke="#888" stroke-width="1.5"/>`,
+  wrongsign:`<polygon points="20,6 34,32 6,32" fill="#E0C0A0" stroke="#C0A080" stroke-width="1.5"/><rect x="18.5" y="14" width="3" height="10" fill="#888" rx="1"/><circle cx="20" cy="28" r="2" fill="#888"/>`,
+  sopsheet:`<rect x="9" y="7" width="22" height="28" fill="#F8F4EC" rx="2" stroke="#D8D0C0" stroke-width="1.5"/><rect x="9" y="7" width="22" height="8" fill="#1C2B3A" rx="2"/><line x1="13" y1="21" x2="27" y2="21" stroke="#A09880" stroke-width="1.5"/><line x1="13" y1="25" x2="27" y2="25" stroke="#B0A890" stroke-width="1"/><line x1="13" y1="29" x2="22" y2="29" stroke="#B0A890" stroke-width="1"/>`,
+  warning:`<polygon points="20,6 34,32 6,32" fill="#F5A623" stroke="#D09010" stroke-width="1.5"/><rect x="18.5" y="14" width="3" height="10" fill="#1C2B3A" rx="1"/><circle cx="20" cy="28" r="2" fill="#1C2B3A"/>`,
+  shield:`<path d="M20 6L32 12L32 22Q32 30 20 34Q8 30 8 22L8 12Z" fill="#4A80C0"/><path d="M14 20L18 24L27 15" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  gauge:`<path d="M6 26A14 14 0 0 1 34 26" fill="none" stroke="#D0C8B8" stroke-width="5"/><path d="M6 26A14 14 0 0 1 20 12" fill="none" stroke="#28A745" stroke-width="5"/><path d="M20 12A14 14 0 0 1 34 26" fill="none" stroke="#DC3545" stroke-width="5"/><circle cx="20" cy="26" r="4.5" fill="#444"/><path d="M20 26L14 16" stroke="#F5A623" stroke-width="2.5" stroke-linecap="round"/>`,
+  taglabel:`<path d="M8 12L26 12L32 20L26 28L8 28Z" fill="#F5E030" stroke="#D4C020" stroke-width="1"/><circle cx="12" cy="20" r="2.5" fill="none" stroke="#888" stroke-width="1.5"/><line x1="16" y1="20" x2="28" y2="20" stroke="#888" stroke-width="1.5"/>`,
+  normalgear:`<circle cx="20" cy="20" r="7" fill="#B0B0B0"/><circle cx="20" cy="20" r="3" fill="#888"/><rect x="18" y="9" width="4" height="5" fill="#B0B0B0" rx="1"/><rect x="18" y="26" width="4" height="5" fill="#B0B0B0" rx="1"/><rect x="9" y="18" width="5" height="4" fill="#B0B0B0" rx="1"/><rect x="26" y="18" width="5" height="4" fill="#B0B0B0" rx="1"/>`,
+  okclipboard:`<rect x="9" y="7" width="22" height="28" fill="#F0F8E8" rx="2" stroke="#A0C890" stroke-width="1.5"/><path d="M14 20L18 24L27 15" stroke="#28A745" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  oklabel:`<path d="M8 12L26 12L32 20L26 28L8 28Z" fill="#C8E0A0" stroke="#80A860" stroke-width="1"/><path d="M13 18L16 21L24 14" stroke="#28A745" stroke-width="2.2" fill="none" stroke-linecap="round"/>`,
+  okbarrier:`<rect x="6" y="14" width="28" height="14" fill="#F5A623" rx="2"/><path d="M6 14L34 28M6 28L34 14" stroke="black" stroke-width="2" opacity=".2"/><rect x="9" y="10" width="5" height="18" fill="#E09010" rx="1"/><rect x="26" y="10" width="5" height="18" fill="#E09010" rx="1"/>`,
+  auditreport:`<rect x="8" y="6" width="24" height="30" fill="#F8F4EC" rx="2" stroke="#C8C0B0" stroke-width="1.5"/><rect x="8" y="6" width="24" height="9" fill="#1C2B3A" rx="2"/><line x1="12" y1="21" x2="28" y2="21" stroke="#A09880" stroke-width="1.5"/><line x1="12" y1="24" x2="28" y2="24" stroke="#B0A890" stroke-width="1"/><line x1="12" y1="27" x2="22" y2="27" stroke="#B0A890" stroke-width="1"/>`,
+  stamp5s:`<rect x="10" y="17" width="20" height="14" fill="#7C3AED" rx="2"/><rect x="8" y="29" width="24" height="5" fill="#6D28D9" rx="1"/><rect x="14" y="10" width="12" height="9" fill="#8B5CF6" rx="2"/><text x="20" y="25" font-family="sans-serif" font-size="8" fill="white" text-anchor="middle" font-weight="bold">5S</text>`,
+  archfolder:`<path d="M6 14L6 32L34 32L34 14Z" fill="#F5A623"/><path d="M6 14L14 14L17 10L34 10L34 14" fill="#F8C040"/><line x1="10" y1="20" x2="30" y2="20" stroke="#D09010" stroke-width="1"/>`,
+  schedule:`<rect x="7" y="10" width="26" height="24" fill="white" rx="3" stroke="#C0C0D0" stroke-width="1.5"/><rect x="7" y="10" width="26" height="9" fill="#1C2B3A" rx="3"/><rect x="12" y="7" width="4" height="7" fill="#888" rx="2"/><rect x="24" y="7" width="4" height="7" fill="#888" rx="2"/><circle cx="13" cy="24" r="1.8" fill="#94a3b8"/><circle cx="20" cy="24" r="1.8" fill="#94a3b8"/><circle cx="27" cy="24" r="1.8" fill="#DC3545"/>`,
+  devform:`<rect x="8" y="7" width="24" height="28" fill="#EFF6FF" rx="2" stroke="#BFDBFE" stroke-width="1.5"/><rect x="11" y="11" width="10" height="5" fill="#BFDBFE" rx="1"/><rect x="23" y="11" width="6" height="5" fill="#BFDBFE" rx="1"/><rect x="11" y="19" width="18" height="3" fill="#BFDBFE" rx="1"/><rect x="11" y="24" width="18" height="3" fill="#BFDBFE" rx="1"/>`,
+  plaindoc:`<rect x="9" y="7" width="22" height="28" fill="#F5F5F5" rx="2" stroke="#D0D0D0" stroke-width="1"/><line x1="13" y1="14" x2="27" y2="14" stroke="#C8C8C8" stroke-width="1.5"/><line x1="13" y1="18" x2="27" y2="18" stroke="#D0D0D0" stroke-width="1"/><line x1="13" y1="22" x2="22" y2="22" stroke="#D0D0D0" stroke-width="1"/>`,
+  oldstamp:`<rect x="10" y="17" width="20" height="14" fill="#9CA3AF" rx="2"/><rect x="8" y="29" width="24" height="5" fill="#6B7280" rx="1"/><rect x="14" y="10" width="12" height="9" fill="#9CA3AF" rx="2"/>`,
+  oldfolder:`<path d="M6 14L6 32L34 32L34 14Z" fill="#D0B888"/><path d="M6 14L14 14L17 10L34 10L34 14" fill="#D8C090"/>`,
+  normalcal:`<rect x="7" y="10" width="26" height="24" fill="white" rx="3" stroke="#E5E7EB" stroke-width="1.5"/><rect x="7" y="10" width="26" height="9" fill="#9CA3AF" rx="3"/><rect x="12" y="7" width="4" height="7" fill="#A0A0A0" rx="2"/><rect x="24" y="7" width="4" height="7" fill="#A0A0A0" rx="2"/>`,
+  plainmemo:`<rect x="8" y="7" width="24" height="28" fill="#FAFAF0" rx="2" stroke="#E8E8C8" stroke-width="1"/><rect x="8" y="7" width="24" height="5" fill="#E8E8C0" rx="2"/><line x1="12" y1="16" x2="28" y2="16" stroke="#D0D0A8" stroke-width="1.5"/>`,
+};
+function ico(k,s=36){
+  const d=ICO[k]||`<rect x="6" y="6" width="28" height="28" fill="#DDD" rx="4"/>`;
+  return`<svg width="${s}" height="${s}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${d}</svg>`;
+}
+
+// ══════════════════════════════════════════════
+// GAME DATA
+// ══════════════════════════════════════════════
+const DATA={
+  l1:[
+    {id:1,name:"Kabel Putus",ico:"kabel",type:"redtag",bg:"#fef2f2"},
+    {id:2,name:"Sampah Plastik",ico:"plastik",type:"redtag",bg:"#eff6ff"},
+    {id:3,name:"Box Produk",ico:"cardbox",type:"essential",bg:"#fffbeb"},
+    {id:4,name:"Mesin Rusak",ico:"gearbroke",type:"redtag",bg:"#fef2f2"},
+    {id:5,name:"Pallet Kayu",ico:"pallet",type:"essential",bg:"#fffbeb"},
+    {id:6,name:"APD Helm",ico:"helmet",type:"essential",bg:"#fffbeb"},
+    {id:7,name:"Koran Bekas",ico:"koran",type:"redtag",bg:"#fef2f2"},
+    {id:8,name:"Bahan Baku",ico:"material",type:"essential",bg:"#f0fdf4"}
+  ],
+  l2:[
+    {id:"t1",name:"Palu",ico:"hammer"},{id:"t2",name:"Kunci-L",ico:"wrench"},
+    {id:"t3",name:"Gergaji",ico:"saw"},{id:"t4",name:"Tang",ico:"pliers"},
+    {id:"t5",name:"Obeng",ico:"screwdriver"},{id:"t6",name:"Bor",ico:"bolt"},
+    {id:"t7",name:"Senter",ico:"flashlight"},{id:"t8",name:"Meteran",ico:"ruler"}
+  ],
+  l3:[
+    {ico:"apple",type:"organic",name:"Sisa Buah",bg:"#fee2e2"},
+    {ico:"oildrop",type:"chemical",name:"Oli",bg:"#e0e0e8"},
+    {ico:"dustpile",type:"dust",name:"Debu",bg:"#f1f5f9"},
+    {ico:"banana",type:"organic",name:"Kulit Pisang",bg:"#fef9c3"},
+    {ico:"flask",type:"chemical",name:"Zat Kimia",bg:"#dbeafe"},
+    {ico:"scrap",type:"dust",name:"Scrap Besi",bg:"#f1f5f9"},
+    {ico:"leaf",type:"organic",name:"Sampah Daun",bg:"#dcfce7"},
+    {ico:"lubcan",type:"chemical",name:"Pelumas",bg:"#fef3c7"}
+  ],
+  l4:[
+    {id:1,name:"GUDANG",diff:"MUDAH",diffCls:"bg-green-100 text-green-700",bgFn:"bgGudang",
+     items:[
+       {name:"Rompi Safety",ico:"vest",x:11,y:50,real:true,sz:40},
+       {name:"Sepatu Safety",ico:"boot",x:73,y:64,real:true,sz:40},
+       {name:"Kacamata",ico:"goggles",x:43,y:17,real:true,sz:40},
+       {name:"APAR Hilang",ico:"apar",x:87,y:58,real:true,sz:40},
+       {name:"Helm Safety",ico:"helmet",x:27,y:38,real:true,sz:40},
+       {name:"Helm Rusak",ico:"helmbroke",x:55,y:73,real:false,trap:true,sz:37},
+       {name:"Tag Expired",ico:"oldtag",x:17,y:70,real:false,trap:true,sz:35},
+       {name:"Rambu Salah",ico:"wrongsign",x:62,y:32,real:false,trap:true,sz:35}
+     ]},
+    {id:2,name:"PRODUKSI",diff:"SEDANG",diffCls:"bg-amber-100 text-amber-700",bgFn:"bgProduksi",
+     items:[
+       {name:"SOP Lepas",ico:"sopsheet",x:14,y:55,real:true,sz:32},
+       {name:"Panel Error",ico:"warning",x:67,y:20,real:true,sz:32},
+       {name:"Guard Terbuka",ico:"shield",x:35,y:69,real:true,sz:32},
+       {name:"Meter Rusak",ico:"gauge",x:80,y:50,real:true,sz:32},
+       {name:"Label Hilang",ico:"taglabel",x:50,y:32,real:true,sz:32},
+       {name:"Part Normal",ico:"normalgear",x:24,y:26,real:false,trap:true,sz:29},
+       {name:"Form OK",ico:"okclipboard",x:70,y:66,real:false,trap:true,sz:29},
+       {name:"Label Benar",ico:"oklabel",x:41,y:13,real:false,trap:true,sz:29},
+       {name:"Barrier OK",ico:"okbarrier",x:57,y:60,real:false,trap:true,sz:29}
+     ]},
+    {id:3,name:"OFFICE",diff:"SULIT",diffCls:"bg-red-100 text-red-700",bgFn:"bgOffice",fog:true,
+     items:[
+       {name:"Laporan Audit",ico:"auditreport",x:10,y:13,real:true,sz:26,drift:"d1",dur:"5s",delay:"0s"},
+       {name:"Stempel 5S",ico:"stamp5s",x:81,y:70,real:true,sz:26,drift:"d2",dur:"4.5s",delay:".8s"},
+       {name:"File Arsip",ico:"archfolder",x:37,y:35,real:true,sz:26,drift:"d3",dur:"6s",delay:"1.4s"},
+       {name:"Jadwal Inspeksi",ico:"schedule",x:63,y:19,real:true,sz:26,drift:"d4",dur:"5.5s",delay:".3s"},
+       {name:"Form Deviasi",ico:"devform",x:23,y:62,real:true,sz:26,drift:"d1",dur:"4.8s",delay:"1.1s"},
+       {name:"Dok.Biasa",ico:"plaindoc",x:54,y:56,real:false,trap:true,sz:24},
+       {name:"Cap Lama",ico:"oldstamp",x:71,y:43,real:false,trap:true,sz:24},
+       {name:"Folder Lama",ico:"oldfolder",x:17,y:45,real:false,trap:true,sz:24},
+       {name:"Kalender Biasa",ico:"normalcal",x:45,y:74,real:false,trap:true,sz:24},
+       {name:"Memo Biasa",ico:"plainmemo",x:87,y:28,real:false,trap:true,sz:24}
+     ]}
+  ],
+  l5:[
+    {sit:"Anda melihat tumpahan oli kecil di jalur pejalan kaki area produksi. Rekan di sebelah Anda pura-pura tidak melihat.",ico:"oildrop",bg:"#e0e0e8",q:"Apa tindakan terbaik Anda?",why:"Tumpahan oli adalah bahaya slip serius. Harus segera ditangani dan dilaporkan ke HSE — bukan ditunda.",
+     choices:[{t:"Biarkan, ada tim kebersihan bertugas",p:-50},{t:"Pasang tanda bahaya, bersihkan, laporkan ke HSE",p:300,correct:true},{t:"Foto dulu untuk laporan nanti",p:-20},{t:"Minta rekan yang lebih dekat untuk menanganinya",p:30}]},
+    {sit:"Manajemen menerbitkan SOP baru untuk penanganan alat. Sejumlah rekan berpendapat cara lama lebih cepat.",ico:"sopsheet",bg:"#eff6ff",q:"Bagaimana sikap Anda?",why:"SOP ada untuk keselamatan & konsistensi mutu. Ikuti sambil sampaikan masukan lewat jalur resmi.",
+     choices:[{t:"Tetap gunakan cara lama karena lebih efisien",p:-50},{t:"Ikuti SOP baru & sampaikan masukan lewat jalur resmi",p:300,correct:true},{t:"Pilih cara yang terasa lebih mudah",p:-30},{t:"Tunggu instruksi lebih lanjut dari atasan",p:50}]},
+    {sit:"Shift hampir selesai, tersisa 10 menit. Area kerja tidak teratur akibat produksi sangat sibuk hari ini.",ico:"schedule",bg:"#fefce8",q:"Apa yang Anda lakukan?",why:"Disiplin 5S berarti area selalu rapi di akhir shift — tanggung jawab tidak diwariskan ke shift berikutnya.",
+     choices:[{t:"Langsung pulang, shift berikutnya yang membereskan",p:-50},{t:"Gunakan 10 menit untuk merapikan area sebelum pulang",p:300,correct:true},{t:"Rapikan sebagian saja, sisanya besok",p:-20},{t:"Catat di logbook bahwa area perlu pembersihan",p:80}]},
+    {sit:"Saat patrol, Anda menemukan alat dari zona merah digunakan di zona hijau tanpa izin pemindahan.",ico:"taglabel",bg:"#fff7ed",q:"Apa respons terbaik Anda?",why:"Ketidaksesuaian harus dikembalikan, dicatat resmi, dan dikomunikasikan di briefing — bukan diabaikan.",
+     choices:[{t:"Kembalikan diam-diam tanpa melaporkan",p:-30},{t:"Kembalikan ke posisi benar, buat catatan, diskusikan di briefing",p:300,correct:true},{t:"Biarkan karena lini produksi sedang berjalan penuh",p:-50},{t:"Foto dan bagikan ke grup WhatsApp departemen",p:50}]},
+    {sit:"Rekan senior Anda tidak memakai APD lengkap di area yang mewajibkan full PPE tanpa pengecualian.",ico:"helmet",bg:"#fef2f2",q:"Apa yang Anda lakukan?",why:"Keselamatan berlaku untuk semua tanpa memandang senioritas. Menegur dengan sopan adalah tindakan yang berani dan tepat.",
+     choices:[{t:"Diam saja — dia lebih senior dan berpengalaman",p:-50},{t:"Ingatkan dengan sopan bahwa APD wajib di area ini",p:300,correct:true},{t:"Langsung laporkan ke HRD tanpa bicara terlebih dahulu",p:-20},{t:"Ikuti saja — jika dia aman, Anda pun aman",p:-100}]},
+    {sit:"Manajemen mengumumkan kunjungan audit vendor mendadak besok pagi. Area kerja masih ada beberapa kekurangan.",ico:"auditreport",bg:"#f0fdf4",q:"Pendekatan paling tepat?",why:"5S bukan pertunjukan untuk audit. Terapkan setiap hari agar selalu audit-ready kapan pun.",
+     choices:[{t:"Bersihkan semua malam ini agar terlihat sempurna",p:50},{t:"Terapkan 5S seperti biasa — bukan untuk kesan, tapi kebiasaan",p:300,correct:true},{t:"Kondisi sehari-hari sudah cukup baik, tidak perlu khawatir",p:-20},{t:"Minta seluruh tim lembur untuk bersih-bersih massal",p:30}]},
+    {sit:"Anda menemukan lemari penyimpanan tanpa label. Isi di dalamnya tidak diketahui jenis maupun bahayanya.",ico:"archfolder",bg:"#f5f3ff",q:"Tindakan terbaik Anda?",why:"Identifikasi dan labeling adalah inti Seiton. Segera tangani dengan label standar — jangan abaikan.",
+     choices:[{t:"Buka dan lihat isinya, labeling bisa dikerjakan nanti",p:-30},{t:"Pasang label sementara, identifikasi isi, buat label permanen",p:300,correct:true},{t:"Laporkan ke supervisor dan tunggu instruksi",p:80},{t:"Kunci lemari sampai ada yang mengklaim kepemilikan",p:-50}]},
+    {sit:"Papan informasi visual 5S di area Anda rusak dan datanya sudah usang selama 2 bulan — tidak ada yang memperbaiki.",ico:"sopsheet",bg:"#fdf4ff",q:"Apa tindakan Anda sebagai supervisor?",why:"Shitsuke = inisiatif tanpa diperintah. Papan visual yang baik menopang budaya 5S secara berkelanjutan.",
+     choices:[{t:"Ini tanggung jawab tim administrasi, bukan urusan operator",p:-50},{t:"Inisiatif perbaiki, perbarui info, koordinasikan dengan tim terkait",p:300,correct:true},{t:"Tunggu sampai ada yang komplain baru perbaiki",p:-30},{t:"Tutupi dengan kertas baru agar kerusakan tidak terlihat",p:-100}]}
+  ]
+};
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+const S={
+  pts:0, time:180, level:1, tmr:null,
+  playerName:'',
+  hearts:3, timeouts:0, trapsHit:0,
+  l2flip:[], l2match:0,
+  l3rem:10,
+  l4stage:1, l4found:0,
+  l5idx:0, l5correct:0,
+  hintsUsed:0,
+  completedAt:null
+};
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+function $(id){return document.getElementById(id)}
+function upScore(){$('score-disp').innerText=S.pts.toLocaleString()}
+function toast(msg,bg){
+  const t=$('toast'),i=$('toast-inner');
+  i.innerText=msg;i.style.background=bg||'#1C2B3A';
+  t.classList.remove('hidden');clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.add('hidden'),1900);
+}
+function floatScore(v,x,y){
+  const e=document.createElement('div');
+  e.className='score-float';
+  e.style.cssText=`left:${x}px;top:${y}px;color:${v>0?'#22c55e':'#ef4444'}`;
+  e.innerText=(v>0?'+':'')+v;
+  document.body.appendChild(e);
+  setTimeout(()=>e.remove(),1100);
+}
+function showScreen(id){
+  ['name-screen','greeting-screen','game-screen','result-screen'].forEach(s=>{
+    $(s).classList.toggle('hidden',s!==id);
+  });
+}
+function unlockBadge(n){
+  const b=$(`bdg-${n}`);
+  if(!b)return;
+  b.classList.remove('opacity-20','grayscale');
+  b.classList.add('badge-drop');
+}
+function showModal(icoHtml,title,body,btnLabel,bgColor,cb){
+  AUD.sfxLevelUp();
+  $('modal-ico').innerHTML=`<div style="width:60px;height:60px">${icoHtml}</div>`;
+  $('modal-ttl').innerText=title;
+  $('modal-bdy').innerText=body;
+  const btn=$('modal-btn');
+  btn.innerText=btnLabel;btn.style.background=bgColor;
+  $('modal-box').style.borderColor=bgColor;
+  btn.onclick=()=>{AUD.sfxClick();$('modal').classList.add('hidden');cb&&cb();};
+  $('modal').classList.remove('hidden');
+}
+function renderHearts(){
+  $('hearts-bar').innerHTML='';
+  for(let i=0;i<3;i++){
+    const alive=i<S.hearts;
+    $('hearts-bar').innerHTML+=`<svg width="18" height="18" viewBox="0 0 40 40"><path d="M20 34Q6 26 6 18Q6 10 13 10Q17 10 20 14Q23 10 27 10Q34 10 34 18Q34 26 20 34Z" fill="${alive?'#DC3545':'none'}" stroke="${alive?'none':'#555'}" stroke-width="${alive?0:2}"/></svg>`;
+  }
+}
+
+// ══════════════════════════════════════════════
+// SCREEN 1 — NAME
+// ══════════════════════════════════════════════
+function enterName(){
+  AUD.boot();
+  AUD.sfxClick();
+  const v=$('name-inp').value.trim();
+  if(!v){$('name-err').classList.remove('hidden');return;}
+  $('name-err').classList.add('hidden');
+  S.playerName=v;
+  showGreeting();
+}
+
+// ══════════════════════════════════════════════
+// SCREEN 2 — GREETING
+// ══════════════════════════════════════════════
+function showGreeting(){
+  showScreen('greeting-screen');
+  const now=new Date();
+  const h=now.getHours();
+  const sal=h<12?'Selamat Pagi':h<15?'Selamat Siang':h<19?'Selamat Sore':'Selamat Malam';
+  const days=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const mo=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  $('greet-salutation').innerText=sal+',';
+  $('greet-name').innerText=S.playerName.toUpperCase();
+  $('greet-clock').innerText=`${days[now.getDay()]}, ${now.getDate()} ${mo[now.getMonth()]} ${now.getFullYear()} · ${String(h).padStart(2,'0')}.${String(now.getMinutes()).padStart(2,'0')} WIB`;
+  $('greet-d1').innerText=`Anda adalah ${S.playerName}, Supervisor Produksi di PT. Maju Bersama Industri — perusahaan manufaktur komponen otomotif terkemuka yang telah berdiri selama 15 tahun. Hari ini laporan QC mencatat lonjakan cacat produk hingga 18% dalam seminggu terakhir, memicu kecemasan di seluruh jajaran manajemen.`;
+  $('greet-d2').innerText=`"${S.playerName}! Kita baru terima notifikasi darurat. PT. Auto Excellence — klien terbesar kita senilai Rp 5 miliar per tahun — akan melakukan kunjungan audit vendor MINGGU DEPAN. Jika skor 5S kita tidak memenuhi standar internasional mereka, kontrak bisa dicabut dan 340 karyawan kita terancam! Saya butuh laporan audit menyeluruh hari ini — gudang, produksi, office — semuanya!"`;
+  $('greet-d3').innerText=`Waktumu terbatas, ${S.playerName}. Buktikan bahwa Anda adalah supervisor yang mampu menegakkan dan mempertahankan standar 5S di seluruh area pabrik ini. Reputasi perusahaan ada di tanganmu!`;
+}
+
+// ══════════════════════════════════════════════
+// SCREEN 3 — START GAME
+// ══════════════════════════════════════════════
+function startGame(){
+  AUD.boot();
+  AUD.sfxClick();
+  showScreen('game-screen');
+  renderHearts();
+  initL1();
+  startTimer();
+  // LMS postMessage: session started
+  try{window.parent.postMessage({type:'5s_game_start',player:S.playerName},'*');}catch(e){}
+}
+
+// ══════════════════════════════════════════════
+// TIMER + HEARTS SYSTEM
+// ══════════════════════════════════════════════
+function startTimer(){
+  clearInterval(S.tmr);
+  renderTimerDisplay();
+  S.tmr=setInterval(()=>{
+    S.time--;
+    renderTimerDisplay();
+    if(S.time<=30){
+      $('timer-box').classList.add('timer-warn');
+    }
+    if(S.time<=0){clearInterval(S.tmr);onTimeUp();}
+  },1000);
+}
+function renderTimerDisplay(){
+  const m=Math.floor(S.time/60),s=S.time%60;
+  $('timer-disp').innerText=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function onTimeUp(){
+  $('timer-box').classList.remove('timer-warn');
+  if(S.hearts>0){
+    AUD.sfxHeartLost();
+    S.hearts--;S.timeouts++;
+    renderHearts();
+    const newTime=S.hearts===2?150:S.hearts===1?110:80;
+    $('ho-hearts').innerText=S.hearts;
+    $('ho-time').innerText=newTime;
+    $('heart-ov').classList.remove('hidden');
+    setTimeout(()=>{
+      $('heart-ov').classList.add('hidden');
+      S.time=newTime;
+      $('timer-box').style.background='#7f1d1d';
+      restartLevel();
+      startTimer();
+    },2800);
+  } else {
+    AUD.sfxGameOver();
+    endGame(false,`Semua nyawa habis. Terus berlatih dan perkuat penguasaan 5S Anda!`);
+  }
+}
+function restartLevel(){
+  switch(S.level){
+    case 1: initL1(true); break;
+    case 2: S.l2flip=[];S.l2match=0;initL2(true); break;
+    case 3: S.l3rem=10;$('l3-rem').innerText=10;
+      setTimeout(()=>spawnL3(),200); break;
+    case 4: S.l4found=0;loadL4(); break;
+    case 5: S.l5idx=0;loadL5(); break;
+  }
+}
+
+// ══════════════════════════════════════════════
+// LEVEL 1 — SEIRI
+// ══════════════════════════════════════════════
+function initL1(reinit=false){
+  S.level=1;
+  $('lvl-title').innerText='Lv1: SEIRI';
+  if(!reinit){showUI('ui-1');}
+  const g=$('l1-grid');g.innerHTML='';
+  [...DATA.l1].sort(()=>Math.random()-.5).forEach(item=>{
+    const el=document.createElement('div');
+    el.className='item-card bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1 p-1.5';
+    el.style.cssText='width:calc(50% - 4px);aspect-ratio:1';
+    el.draggable=true;el.id=`l1-${item.id}`;el.dataset.type=item.type;
+    el.innerHTML=`<div class="rounded-lg flex items-center justify-center" style="width:44px;height:44px;background:${item.bg}">${ico(item.ico,30)}</div><span style="font-size:8px;font-weight:700;text-align:center;color:#475569;line-height:1.2">${item.name}</span>`;
+    el.addEventListener('dragstart',e=>{e.dataTransfer.setData('text',el.id);el.classList.add('dragging');});
+    el.addEventListener('dragend',()=>{el.classList.remove('dragging');resetPos(el);});
+    // Touch drag
+    let ts,ox,oy;
+    el.addEventListener('touchstart',e=>{
+      ts=e.touches[0];
+      const r=el.getBoundingClientRect();
+      ox=r.left;oy=r.top;
+      el.style.position='fixed';el.style.zIndex=200;el.style.width=r.width+'px';
+      el.classList.add('dragging');
+    },{passive:true});
+    el.addEventListener('touchmove',e=>{
+      const t=e.touches[0];
+      el.style.left=(ox+t.clientX-ts.clientX)+'px';
+      el.style.top=(oy+t.clientY-ts.clientY)+'px';
+      e.preventDefault();
+    },{passive:false});
+    el.addEventListener('touchend',e=>{
+      el.classList.remove('dragging');
+      const t=e.changedTouches[0];
+      const targets=document.elementsFromPoint(t.clientX,t.clientY);
+      const zone=targets.find(x=>x.dataset&&x.dataset.target);
+      resetPos(el);
+      if(zone)dropL1(zone.dataset.target,el);
+    });
+    g.appendChild(el);
+  });
+  // Drop zones
+  document.querySelectorAll('[data-target]').forEach(z=>{
+    z.addEventListener('dragover',e=>{e.preventDefault();z.style.transform='scale(1.03)';z.style.filter='brightness(1.05)';});
+    z.addEventListener('dragleave',()=>{z.style.transform='';z.style.filter='';});
+    z.addEventListener('drop',e=>{
+      e.preventDefault();z.style.transform='';z.style.filter='';
+      const el=document.getElementById(e.dataTransfer.getData('text'));
+      if(el)dropL1(z.dataset.target,el);
+    });
+  });
+}
+function resetPos(el){el.style.position='';el.style.left='';el.style.top='';el.style.zIndex='';el.style.width='';}
+function dropL1(tgt,el){
+  const r=el.getBoundingClientRect();
+  if(el.dataset.type===tgt){
+    S.pts+=100;upScore();floatScore(100,r.left,r.top);
+    AUD.sfxCorrect();
+    toast('Benar! +100','#16a34a');el.remove();
+    if(!$('l1-grid').querySelectorAll('.item-card').length){
+      unlockBadge(1);
+      showModal(ico('cardbox',56),'SEIRI SELESAI!','Area sudah ringkas. Saatnya menata semua alat ke posisi yang benar.','LANJUT SEITON →','#9333ea',initL2);
+    }
+  } else {
+    S.pts=Math.max(0,S.pts-30);upScore();floatScore(-30,r.left,r.top);
+    AUD.sfxWrong();
+    toast('Zona salah! −30','#dc2626');
+    el.classList.add('animate-shake');resetPos(el);
+    setTimeout(()=>el.classList.remove('animate-shake'),420);
+  }
+}
+
+// ══════════════════════════════════════════════
+// LEVEL 2 — SEITON
+// ══════════════════════════════════════════════
+function initL2(reinit=false){
+  S.level=2;S.l2flip=[];S.l2match=0;
+  $('lvl-title').innerText='Lv2: SEITON';
+  if(!reinit)showUI('ui-2');
+  const g=$('mem-grid');g.innerHTML='';
+  let cards=[];
+  DATA.l2.forEach(p=>{
+    cards.push({id:p.id,ico:p.ico,name:p.name,type:'tool'});
+    cards.push({id:p.id,ico:p.ico,name:`Panel ${p.name}`,type:'shadow'});
+  });
+  cards.sort(()=>Math.random()-.5).forEach(card=>{
+    const el=document.createElement('div');
+    el.className='perspective cursor-pointer';
+    el.style.height='clamp(56px,9vw,88px)';
+    const si=`<svg width="26" height="26" viewBox="0 0 40 40" style="opacity:.3;filter:grayscale(1)">${ICO[card.ico]||''}</svg>`;
+    el.innerHTML=`<div class="flip-inner h-full" data-id="${card.id}" data-type="${card.type}">
+      <div class="flip-front border-2 border-slate-600 shadow" style="background:#253545">
+        <svg width="20" height="20" viewBox="0 0 40 40"><text x="20" y="28" font-size="22" fill="white" text-anchor="middle" font-weight="bold" font-family="Oswald,sans-serif">?</text></svg>
+      </div>
+      <div class="flip-back bg-white border-2 border-purple-300 gap-0.5">
+        ${card.type==='tool'?ico(card.ico,26):si}
+        <span style="font-size:6px;font-weight:700;text-transform:uppercase;text-align:center;color:#6b7280;line-height:1.2;padding:0 2px">${card.name}</span>
+      </div>
+    </div>`;
+    el.addEventListener('click',()=>flipL2(el.querySelector('.flip-inner')));
+    g.appendChild(el);
+  });
+}
+function flipL2(inner){
+  if(S.l2flip.length>=2||inner.classList.contains('flipped')||inner.dataset.matched)return;
+  AUD.sfxFlip();
+  inner.parentElement.classList.add('flipped');
+  S.l2flip.push(inner);
+  if(S.l2flip.length===2)setTimeout(checkL2,680);
+}
+function checkL2(){
+  const[a,b]=S.l2flip;
+  if(a.dataset.id===b.dataset.id&&a.dataset.type!==b.dataset.type){
+    S.pts+=150;upScore();floatScore(150,window.innerWidth/2,100);
+    AUD.sfxMatch();
+    toast('Cocok! +150','#9333ea');
+    a.dataset.matched=b.dataset.matched='1';
+    [a,b].forEach(c=>{c.style.opacity='.38';c.parentElement.style.pointerEvents='none';});
+    S.l2match++;
+    if(S.l2match===8){
+      unlockBadge(2);
+      showModal(ico('ruler',56),'SEITON SELESAI!','Semua alat tertata rapi. Kini saatnya bersihkan area di Level 3!','LANJUT SEISO →','#059669',initL3);
+    }
+  } else {
+    S.pts=Math.max(0,S.pts-20);upScore();floatScore(-20,window.innerWidth/2,100);
+    AUD.sfxNoMatch();
+    toast('Tidak cocok! −20','#d97706');
+    [a,b].forEach(c=>c.parentElement.classList.remove('flipped'));
+  }
+  S.l2flip=[];
+}
+
+// ══════════════════════════════════════════════
+// LEVEL 3 — SEISO
+// ══════════════════════════════════════════════
+function initL3(reinit=false){
+  S.level=3;S.l3rem=10;
+  $('lvl-title').innerText='Lv3: SEISO';
+  $('l3-rem').innerText=10;
+  if(!reinit)showUI('ui-3');
+  spawnL3();
+}
+function spawnL3(){
+  if(S.l3rem<=0)return;
+  const sp=$('l3-spawner');sp.innerHTML='';
+  const t=DATA.l3[Math.floor(Math.random()*DATA.l3.length)];
+  const el=document.createElement('div');
+  el.className='throwable flex flex-col items-center justify-center gap-0.5 rounded-full shadow-xl border-4 select-none';
+  el.style.cssText=`width:clamp(70px,14vw,90px);height:clamp(70px,14vw,90px);background:white;border-color:#34d399;cursor:grab`;
+  el.innerHTML=`<div style="background:${t.bg};border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center">${ico(t.ico,30)}</div><span style="font-size:7px;font-weight:800;color:#374151;font-family:var(--fh);white-space:nowrap">${t.name}</span>`;
+  el.dataset.type=t.type;
+  let sx,sy,drag=false;
+  const dn=e=>{drag=true;const p=e.touches?e.touches[0]:e;sx=p.clientX;sy=p.clientY;el.style.zIndex=100;};
+  const mv=e=>{if(!drag)return;const p=e.touches?e.touches[0]:e;el.style.transform=`translate(${p.clientX-sx}px,${p.clientY-sy}px) scale(1.08)`;};
+  const up=e=>{
+    if(!drag)return;drag=false;el.style.transform='';el.style.zIndex='';
+    const p=e.changedTouches?e.changedTouches[0]:e;
+    const bin=document.elementsFromPoint(p.clientX,p.clientY).find(x=>x.classList.contains('trash-bin'));
+    if(bin&&bin.dataset.bin===el.dataset.type){
+      S.pts+=200;S.l3rem--;upScore();
+      floatScore(200,p.clientX,p.clientY);
+      $('l3-rem').innerText=S.l3rem;
+      bin.classList.add('hit');setTimeout(()=>bin.classList.remove('hit'),220);
+      AUD.sfxBin();
+      toast('Tepat! +200','#059669');
+      if(!S.l3rem){
+        unlockBadge(3);
+        showModal(ico('dustpile',56),'SEISO SELESAI!','Area sudah bersih! Level 4 menunggu — audit 3 area pabrik dengan sangat teliti.','LANJUT SEIKETSU →','#4338ca',initL4);
+      } else spawnL3();
+    } else {
+      S.pts=Math.max(0,S.pts-50);upScore();
+      floatScore(-50,p.clientX,p.clientY);
+      if(bin) AUD.sfxWrongBin(); else AUD.sfxMiss();
+      toast(bin?'Salah tong! −50':'Meleset! −50','#d97706');
+    }
+  };
+  el.onmousedown=dn;el.ontouchstart=dn;
+  window.onmousemove=mv;window.ontouchmove=mv;
+  window.onmouseup=up;window.ontouchend=up;
+  sp.appendChild(el);
+}
+
+// ══════════════════════════════════════════════
+// LEVEL 4 — SEIKETSU
+// ══════════════════════════════════════════════
+function initL4(reinit=false){
+  S.level=4;S.l4stage=1;S.l4found=0;
+  $('lvl-title').innerText='Lv4: SEIKETSU';
+  if(!reinit)showUI('ui-4');
+  loadL4();
+}
+function loadL4(){
+  const st=DATA.l4[S.l4stage-1];
+  S.l4found=0;
+  $('l4-name').innerText=`AREA ${S.l4stage}: ${st.name}`;
+  $('l4-counter').innerText=`0/5`;
+  $('l4-stage').innerText=`Area ${S.l4stage}/3`;
+  const dd=$('l4-diff');
+  dd.className=`fh text-[9px] font-bold rounded-full px-2 py-0.5 ${st.diffCls}`;
+  dd.innerText=st.diff;
+  $('l4-hint-txt').innerText=
+    S.l4stage===3?'SULIT: Item bergerak & jebakan sangat mirip — gunakan Hint jika perlu!':
+    S.l4stage===2?'Item lebih kecil, lebih banyak jebakan. Periksa dengan sangat teliti!':
+    'Temukan item tidak standar / hilang dari posisinya. Hindari jebakan!';
+  const canvas=$('l4-canvas');canvas.innerHTML='';
+  // Background
+  const bg=document.createElement('div');
+  bg.style.cssText='position:absolute;inset:0;pointer-events:none';
+  bg.innerHTML=window[st.bgFn]();
+  canvas.appendChild(bg);
+  // Fog
+  if(st.fog){const f=document.createElement('div');f.className='fog-overlay';canvas.appendChild(f);}
+  // Items
+  [...st.items].sort(()=>Math.random()-.5).forEach(obj=>{
+    const el=document.createElement('div');
+    el.className='l4-item'+(obj.real?' l4-real':'');
+    el.style.cssText=`left:${obj.x}%;top:${obj.y}%;`;
+    if(obj.drift){el.style.animation=`${obj.drift} ${obj.dur} ease-in-out infinite`;el.style.animationDelay=obj.delay||'0s';}
+    el.innerHTML=`<div class="l4-icon" style="width:${obj.sz}px;height:${obj.sz}px;padding:3px">${ico(obj.ico,obj.sz-6)}</div><div class="l4-label">${obj.name}</div>`;
+    el.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(el.classList.contains('found')||el.dataset.cd)return;
+      if(obj.real){
+        el.classList.add('found');S.l4found++;S.pts+=300;upScore();
+        floatScore(300,e.clientX,e.clientY);
+        AUD.sfxFound();
+        toast(`Ditemukan: ${obj.name}  +300`,'#4338ca');
+        $('l4-counter').innerText=`${S.l4found}/5`;
+        if(S.l4found>=5)setTimeout(nextL4Stage,700);
+      } else if(obj.trap){
+        el.classList.add('trap-flash');el.dataset.cd='1';
+        setTimeout(()=>delete el.dataset.cd,750);
+        S.pts=Math.max(0,S.pts-100);S.trapsHit++;upScore();
+        floatScore(-100,e.clientX,e.clientY);
+        AUD.sfxTrap();
+        toast('JEBAKAN! −100','#dc2626');
+      }
+    });
+    canvas.appendChild(el);
+  });
+}
+function nextL4Stage(){
+  S.l4stage++;
+  if(S.l4stage<=3){
+    toast(`Area ${S.l4stage-1} selesai! Lanjut...`,'#4338ca');
+    setTimeout(loadL4,1200);
+  } else {
+    unlockBadge(4);
+    showModal(ico('auditreport',56),'SEIKETSU SELESAI!','Semua area pabrik telah diaudit! Satu tantangan tersisa — tunjukkan kebijaksanaan 5S Anda!','LANJUT SHITSUKE →','#0d9488',initL5);
+  }
+}
+
+// ══════════════════════════════════════════════
+// LEVEL 5 — SHITSUKE
+// ══════════════════════════════════════════════
+function initL5(reinit=false){
+  S.level=5;S.l5idx=0;S.l5correct=0;
+  $('lvl-title').innerText='Lv5: SHITSUKE';
+  if(!reinit)showUI('ui-5');
+  loadL5();
+}
+function loadL5(){
+  const sc=DATA.l5[S.l5idx];
+  $('l5-num').innerText=S.l5idx+1;
+  $('l5-bar').style.width=`${(S.l5idx/8)*100}%`;
+  $('l5-correct').innerText=S.l5correct;
+  $('l5-text').innerText=sc.sit;
+  $('l5-q').innerText=sc.q;
+  const iEl=$('l5-ico');iEl.innerHTML=ico(sc.ico,40);iEl.style.background=sc.bg;
+  $('l5-fb').classList.add('hidden');
+  const cc=$('l5-choices');cc.innerHTML='';
+  const labels=['A','B','C','D'];
+  const shuffled=[...sc.choices].sort(()=>Math.random()-.5);
+  shuffled.forEach((ch,i)=>{
+    const btn=document.createElement('button');
+    btn.className='l5-choice';
+    btn.dataset.correct=ch.correct?'true':'false';
+    btn.innerHTML=`<span class="fh font-bold text-xs" style="color:#0d9488">${labels[i]}.</span> <span style="font-size:10px;font-weight:700;color:#334155;line-height:1.35;display:inline">${ch.t}</span>`;
+    btn.addEventListener('click',()=>pickL5(ch,btn,shuffled));
+    cc.appendChild(btn);
+  });
+}
+function pickL5(ch,btn,all){
+  cc=document.getElementById('l5-choices');
+  // Disable all
+  cc.querySelectorAll('.l5-choice').forEach(b=>{b.disabled=true;});
+  const correct=ch.correct===true;
+  if(correct) AUD.sfxScenarioRight(); else AUD.sfxScenarioWrong();
+  btn.classList.add(correct?'correct-reveal':'wrong-pick');
+  if(!correct){
+    cc.querySelectorAll('.l5-choice').forEach(b=>{if(b.dataset.correct==='true')b.classList.add('correct-reveal');});
+  }
+  if(correct)S.l5correct++;
+  S.pts=Math.max(0,S.pts+ch.p);upScore();
+  floatScore(ch.p,window.innerWidth/2,200);
+
+  // Feedback
+  const fb=$('l5-fb');
+  $('l5-fb-ico').innerHTML=correct
+    ?`<svg width="28" height="28" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#28A745"/><path d="M12 20L17 25L28 14" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    :`<svg width="28" height="28" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#DC3545"/><line x1="13" y1="13" x2="27" y2="27" stroke="white" stroke-width="3" stroke-linecap="round"/><line x1="27" y1="13" x2="13" y2="27" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>`;
+  $('l5-fb-pts').innerText=(correct?'BENAR! ':' ')+(ch.p>0?`+${ch.p}`:ch.p);
+  $('l5-fb-pts').style.color=correct?'#16a34a':'#dc2626';
+  $('l5-fb-why').innerText=DATA.l5[S.l5idx].why;
+  fb.style.borderColor=correct?'#86efac':'#fca5a5';
+  fb.style.background=correct?'#f0fdf4':'#fef2f2';
+  fb.classList.remove('hidden');
+
+  setTimeout(()=>{
+    S.l5idx++;
+    if(S.l5idx>=8){
+      $('l5-bar').style.width='100%';
+      unlockBadge(5);
+      endGame(true,`Simulasi audit selesai! ${S.l5correct}/8 skenario dijawab dengan keputusan terbaik.`);
+    } else loadL5();
+  },2700);
+}
+
+// ══════════════════════════════════════════════
+// HINT SYSTEM (all levels)
+// ══════════════════════════════════════════════
+function useHint(){
+  AUD.sfxHint();
+  S.pts=Math.max(0,S.pts-50);upScore();S.hintsUsed++;
+  toast('Hint aktif — −50 poin','#b45309');
+  if(S.level===1){
+    // Glow one card + its correct zone
+    const cards=[...$('l1-grid').querySelectorAll('.item-card')];
+    if(!cards.length)return;
+    const el=cards[Math.floor(Math.random()*cards.length)];
+    el.classList.add('hint-card');setTimeout(()=>el.classList.remove('hint-card'),2400);
+    const zid=el.dataset.type==='redtag'?'drop-redtag':'drop-essential';
+    const zone=$(zid);zone.classList.add('hint-zone');setTimeout(()=>zone.classList.remove('hint-zone'),2400);
+  } else if(S.level===2){
+    const all=[...document.querySelectorAll('.flip-inner:not([data-matched])')];
+    const tool=all.find(c=>c.dataset.type==='tool'&&!c.parentElement.classList.contains('flipped'));
+    if(!tool)return;
+    const shadow=all.find(c=>c.dataset.type==='shadow'&&c.dataset.id===tool.dataset.id&&!c.parentElement.classList.contains('flipped'));
+    if(!shadow)return;
+    tool.parentElement.classList.add('flipped');shadow.parentElement.classList.add('flipped');
+    setTimeout(()=>{if(!tool.dataset.matched){tool.parentElement.classList.remove('flipped');shadow.parentElement.classList.remove('flipped');}},1800);
+  } else if(S.level===3){
+    const th=document.querySelector('.throwable');if(!th)return;
+    const bin=document.querySelector(`[data-bin="${th.dataset.type}"]`);if(!bin)return;
+    bin.classList.add('hint-bin');setTimeout(()=>bin.classList.remove('hint-bin'),2200);
+  } else if(S.level===4){
+    document.querySelectorAll('.l4-real:not(.found)').forEach(el=>{
+      el.classList.add('hint-glow');setTimeout(()=>el.classList.remove('hint-glow'),2500);
+    });
+  } else if(S.level===5){
+    const cb=document.querySelector('.l5-choice[data-correct="true"]:not(:disabled)');if(!cb)return;
+    cb.classList.add('hint-choice');setTimeout(()=>cb.classList.remove('hint-choice'),2400);
+  }
+}
+
+// ══════════════════════════════════════════════
+// SHOW UI PANEL
+// ══════════════════════════════════════════════
+function showUI(id){
+  ['ui-1','ui-2','ui-3','ui-4','ui-5'].forEach(u=>{
+    const el=$(u);if(el)el.classList.toggle('hidden',u!==id);
+  });
+}
+
+// ══════════════════════════════════════════════
+// END GAME + RESULT SCREEN
+// ══════════════════════════════════════════════
+function endGame(win,msg){
+  clearInterval(S.tmr);
+  window.onmousemove=window.ontouchmove=window.onmouseup=window.ontouchend=null;
+  if(win) setTimeout(()=>AUD.sfxVictory(),500); else AUD.sfxGameOver();
+  S.completedAt=new Date();
+
+  const badges=[1,2,3,4,5].filter(n=>!$(`bdg-${n}`).classList.contains('opacity-20'));
+  const bc=badges.length;
+  const nm=S.playerName;
+
+  // Tier logic
+  let tier,tierBg,tierTxt,tierIco,narr;
+  if(bc===5&&S.pts>=5500){
+    tier='SUPERVISOR TELADAN';tierBg='#FFF7ED';tierTxt='#B45309';tierIco='★';
+    narr=[
+      `${nm}, Anda telah melampaui ekspektasi tertinggi. Setiap area pabrik berhasil diidentifikasi dengan presisi penuh, dan setiap keputusan skenario mencerminkan pemahaman 5S yang matang serta integritas seorang pemimpin sejati.`,
+      `PT. Auto Excellence sangat terkesan. Direktur Operasional berdiri dan menyampaikan: "Ini adalah hasil audit terbaik sepanjang sejarah kemitraan kita. Kontrak diperpanjang tiga tahun ke depan — dan Anda kami rekomendasikan sebagai fasilitator 5S regional!"`,
+      `${nm}, Anda bukan sekadar memahami 5S sebagai prosedur. Anda telah menjadikannya budaya. Inilah yang membedakan seorang supervisor dengan seorang pemimpin industri. Selamat, Factory Hero!`
+    ];
+  } else if(bc>=4&&S.pts>=3500){
+    tier='SUPERVISOR KOMPETEN';tierBg='#F0FDF4';tierTxt='#15803D';tierIco='✓';
+    narr=[
+      `${nm}, Anda menunjukkan kompetensi audit yang kuat dan pemahaman 5S yang solid di sebagian besar area. Hanya beberapa detail minor yang terlewat dari pengamatan Anda.`,
+      `PT. Auto Excellence memberikan penilaian positif. Direktur berkata: "Bagus, ${nm}. Kita lolos audit ini dengan status 'Good Standing'. Ada beberapa catatan perbaikan minor yang harus ditindaklanjuti dalam 30 hari ke depan."`,
+      `Tingkatkan ketajaman pengamatan Anda di area dengan kompleksitas tinggi. Fondasi yang Anda miliki sudah sangat baik — konsistensi akan membawa Anda ke level Teladan di audit berikutnya!`
+    ];
+  } else if(bc>=3&&S.pts>=2000){
+    tier='SUPERVISOR BERKEMBANG';tierBg='#EFF6FF';tierTxt='#1D4ED8';tierIco='↑';
+    narr=[
+      `${nm}, Anda berada di jalur yang benar. Beberapa area berhasil diaudit dengan baik, namun masih ada bagian signifikan yang perlu penguatan pemahaman dan ketajaman observasi.`,
+      `PT. Auto Excellence memberikan status "Conditional Pass" — kontrak dilanjutkan dengan syarat perbaikan dalam 60 hari. Direktur berkata serius: "Kita masih punya kesempatan, ${nm}. Saya percaya Anda bisa memenuhi semua catatan ini."`,
+      `Perdalam pemahaman setiap prinsip 5S dan latih kepekaan terhadap anomali di lapangan. Setiap supervisor berpengalaman pernah melewati kurva belajar ini — yang penting adalah konsistensi dalam berlatih.`
+    ];
+  } else if(bc>=1&&S.pts>=800){
+    tier='PESERTA BERPOTENSI';tierBg='#FFF7ED';tierTxt='#C2410C';tierIco='→';
+    narr=[
+      `${nm}, Anda berhasil menyelesaikan sebagian simulasi dengan beberapa capaian yang patut diapresiasi. Namun secara keseluruhan masih banyak ruang untuk perkembangan yang signifikan.`,
+      `PT. Auto Excellence memberikan catatan serius. Direktur berkata: "${nm}, hasil ini belum memenuhi standar minimum yang dipersyaratkan. Kita perlu program perbaikan intensif dalam 90 hari."`,
+      `Jadikan ini sebagai motivasi untuk belajar lebih mendalam. Kembalilah ke materi 5S dasar, pahami 'mengapa' di balik setiap prinsip, dan ulangi simulasi ini. Potensi Anda untuk berkembang sangat nyata!`
+    ];
+  } else {
+    tier='PERLU PEMBINAAN';tierBg='#FFF1F2';tierTxt='#BE123C';tierIco='!';
+    narr=[
+      `${nm}, simulasi kali ini menunjukkan bahwa pemahaman 5S masih perlu dibangun dari fondasi yang lebih kuat. Banyak ketidaksesuaian yang seharusnya terdeteksi masih terlewatkan.`,
+      `PT. Auto Excellence menemukan sejumlah masalah kritis. Direktur memutuskan: "${nm}, saya mendaftarkan Anda ke program pelatihan 5S intensif satu bulan sebelum kita bisa melanjutkan kemitraan ini."`,
+      `Jangan berkecil hati — setiap ahli dulunya adalah pemula. Pelajari konsep SEIRI, SEITON, SEISO, SEIKETSU, dan SHITSUKE secara sistematis, kemudian kembali dan tunjukkan bahwa Anda bisa melampaui target ini!`
+    ];
+  }
+
+  // Build result screen
+  showScreen('result-screen');
+  const tb=$('res-tier-badge');
+  tb.style.background=tierBg;tb.style.border=`2px solid ${tierTxt}40`;
+  $('res-tier-ico').innerText=tierIco;$('res-tier-ico').style.color=tierTxt;
+  $('res-tier').innerText=tier;$('res-tier').style.color=tierTxt;
+  $('res-player-name').innerText=nm;
+  const now=S.completedAt;
+  const mo=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  $('res-timestamp').innerText=`${now.getDate()} ${mo[now.getMonth()]} ${now.getFullYear()} · ${String(now.getHours()).padStart(2,'0')}.${String(now.getMinutes()).padStart(2,'0')} WIB`;
+  $('final-score').innerText=S.pts.toLocaleString();
+  $('res-badge-cnt').innerText=bc;
+  $('res-scenario').innerText=S.l5correct;
+  $('res-hints').innerText=`${S.hintsUsed}×`;
+  $('res-timeouts').innerText=`${S.timeouts}×`;
+  $('res-traps').innerText=`${S.trapsHit}×`;
+
+  // Hearts remaining
+  const rh=$('res-hearts');rh.innerHTML='';
+  for(let i=0;i<3;i++){
+    rh.innerHTML+=`<svg width="16" height="16" viewBox="0 0 40 40"><path d="M20 34Q6 26 6 18Q6 10 13 10Q17 10 20 14Q23 10 27 10Q34 10 34 18Q34 26 20 34Z" fill="${i<S.hearts?'#DC3545':'none'}" stroke="${i<S.hearts?'none':'#aaa'}" stroke-width="${i<S.hearts?0:2}"/></svg>`;
+  }
+
+  // Narrative
+  $('res-narr-body').innerHTML=narr.map(p=>`<p class="mb-2 leading-relaxed">${p}</p>`).join('');
+  $('res-narr').style.borderColor=tierTxt;
+
+  // Badge display
+  const bEl=$('res-badges');bEl.innerHTML='';
+  const bdgDefs=[
+    {n:1,bg:'#3b82f6',label:'Seiri'},{n:2,bg:'#a855f7',label:'Seiton'},
+    {n:3,bg:'#10b981',label:'Seiso'},{n:4,bg:'#4f46e5',label:'Seiketsu'},
+    {n:5,bg:'#0d9488',label:'Shitsuke'}
+  ];
+  bdgDefs.forEach(b=>{
+    const earned=badges.includes(b.n);
+    const d=document.createElement('div');d.className='text-center';
+    d.innerHTML=`<div class="w-10 h-10 rounded-full flex items-center justify-center shadow mx-auto" style="background:${earned?b.bg:'#d1d5db'};${earned?'':'filter:grayscale(1)'}"><svg width="18" height="18" viewBox="0 0 40 40">${earned?'<polygon points="20,4 24,16 36,16 27,24 30,36 20,28 10,36 13,24 4,16 16,16" fill="white"/>':'<rect x="11" y="18" width="18" height="4" fill="#aaa" rx="2"/>'}</svg></div><span class="text-[8px] fh font-bold block mt-0.5" style="color:${earned?b.bg:'#aaa'}">${b.label}</span>`;
+    bEl.appendChild(d);
+  });
+
+  // LMS postMessage
+  try{
+    window.parent.postMessage({
+      type:'5s_game_complete',
+      player:nm,score:S.pts,badges:bc,tier,
+      scenarios:S.l5correct,passed:win,
+      completedAt:now.toISOString()
+    },'*');
+  } catch(e){}
+}
+
+// ══════════════════════════════════════════════
+// PRINT CERTIFICATE
+// ══════════════════════════════════════════════
+function printCert(){
+  window.print();
+}
+
+// ══════════════════════════════════════════════
+// SVG BACKGROUNDS
+// ══════════════════════════════════════════════
+function bgGudang(){return`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1000 460" preserveAspectRatio="xMidYMid slice"><rect width="1000" height="460" fill="#CBBFA5"/><rect y="0" width="1000" height="28" fill="#6A6050"/><line x1="220" y1="28" x2="220" y2="68" stroke="#888" stroke-width="3"/><polygon points="205,68 235,68 228,106 212,106" fill="#E8E860" opacity=".95"/><ellipse cx="220" cy="112" rx="28" ry="8" fill="#FFFF80" opacity=".2"/><line x1="520" y1="28" x2="520" y2="68" stroke="#888" stroke-width="3"/><polygon points="505,68 535,68 528,106 512,106" fill="#E8E860" opacity=".95"/><ellipse cx="520" cy="112" rx="28" ry="8" fill="#FFFF80" opacity=".2"/><line x1="820" y1="28" x2="820" y2="68" stroke="#888" stroke-width="3"/><polygon points="805,68 835,68 828,106 812,106" fill="#E8E860" opacity=".95"/><ellipse cx="820" cy="112" rx="28" ry="8" fill="#FFFF80" opacity=".2"/><line x1="0" y1="185" x2="1000" y2="185" stroke="#B5A890" stroke-width="1.5"/><line x1="250" y1="28" x2="250" y2="355" stroke="#B5A890" stroke-width="1"/><line x1="500" y1="28" x2="500" y2="355" stroke="#B5A890" stroke-width="1"/><line x1="750" y1="28" x2="750" y2="355" stroke="#B5A890" stroke-width="1"/><rect y="355" width="1000" height="105" fill="#9A8A70"/><rect y="355" width="1000" height="5" fill="#F5A623"/><rect x="22" y="58" width="12" height="297" fill="#5A4530"/><rect x="184" y="58" width="12" height="297" fill="#5A4530"/><rect x="22" y="58" width="174" height="8" fill="#7A6040"/><rect x="22" y="118" width="174" height="8" fill="#7A6040"/><rect x="22" y="198" width="174" height="8" fill="#7A6040"/><rect x="22" y="278" width="174" height="8" fill="#7A6040"/><rect x="28" y="73" width="44" height="45" fill="#D4876B" rx="2"/><rect x="76" y="80" width="38" height="38" fill="#C4A070" rx="2"/><rect x="118" y="70" width="42" height="48" fill="#B87855" rx="2"/><rect x="28" y="130" width="52" height="68" fill="#8BA0C8" rx="2"/><rect x="84" y="138" width="40" height="60" fill="#6880A8" rx="2"/><rect x="128" y="130" width="30" height="68" fill="#5A6E90" rx="2"/><rect x="28" y="210" width="48" height="68" fill="#A8C87A" rx="2"/><rect x="80" y="215" width="58" height="63" fill="#C8A860" rx="2"/><rect x="142" y="210" width="36" height="68" fill="#D4876B" rx="2"/><rect x="302" y="58" width="12" height="297" fill="#5A4530"/><rect x="474" y="58" width="12" height="297" fill="#5A4530"/><rect x="302" y="58" width="184" height="8" fill="#7A6040"/><rect x="302" y="118" width="184" height="8" fill="#7A6040"/><rect x="302" y="198" width="184" height="8" fill="#7A6040"/><rect x="302" y="278" width="184" height="8" fill="#7A6040"/><rect x="308" y="72" width="58" height="46" fill="#C8A860" rx="2"/><rect x="370" y="78" width="46" height="40" fill="#D4876B" rx="2"/><rect x="420" y="67" width="50" height="51" fill="#A0C080" rx="2"/><rect x="308" y="130" width="42" height="68" fill="#B87855" rx="2"/><rect x="354" y="138" width="68" height="60" fill="#8090B0" rx="2"/><rect x="308" y="210" width="88" height="68" fill="#C8E0A0" rx="2"/><rect x="400" y="218" width="50" height="60" fill="#A87840" rx="2"/><rect x="552" y="58" width="12" height="297" fill="#5A4530"/><rect x="724" y="58" width="12" height="297" fill="#5A4530"/><rect x="552" y="58" width="184" height="8" fill="#7A6040"/><rect x="552" y="118" width="184" height="8" fill="#7A6040"/><rect x="552" y="198" width="184" height="8" fill="#7A6040"/><rect x="552" y="278" width="184" height="8" fill="#7A6040"/><rect x="558" y="75" width="46" height="43" fill="#9090C0" rx="2"/><rect x="608" y="68" width="60" height="50" fill="#C08060" rx="2"/><rect x="672" y="75" width="42" height="43" fill="#80A870" rx="2"/><rect x="558" y="130" width="65" height="68" fill="#D4C060" rx="2"/><rect x="627" y="138" width="42" height="60" fill="#B87855" rx="2"/><rect x="558" y="210" width="55" height="68" fill="#B0C890" rx="2"/><rect x="617" y="215" width="42" height="63" fill="#D0A060" rx="2"/><rect x="663" y="210" width="50" height="68" fill="#C87060" rx="2"/><rect x="808" y="255" width="162" height="90" fill="#F5A623" rx="6"/><rect x="862" y="158" width="20" height="97" fill="#C88010"/><rect x="828" y="342" width="148" height="9" fill="#A07010" rx="2"/><rect x="828" y="356" width="148" height="9" fill="#A07010" rx="2"/><circle cx="848" cy="352" r="22" fill="#282828"/><circle cx="848" cy="352" r="11" fill="#484848"/><circle cx="968" cy="352" r="22" fill="#282828"/><circle cx="968" cy="352" r="11" fill="#484848"/><rect x="862" y="205" width="82" height="50" fill="#F8C030" rx="4"/><rect x="867" y="210" width="72" height="40" fill="#88C0D8" rx="3" opacity=".85"/><ellipse cx="897" cy="200" rx="13" ry="15" fill="#3A2510"/><rect x="885" y="215" width="24" height="28" fill="#3A2510"/></svg>`;}
+
+function bgProduksi(){return`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1000 460" preserveAspectRatio="xMidYMid slice"><rect width="1000" height="460" fill="#3A4555"/><rect y="0" width="1000" height="22" fill="#2A3040"/><rect x="80" y="22" width="120" height="28" fill="#333545" rx="2"/><rect x="280" y="22" width="120" height="28" fill="#333545" rx="2"/><rect x="480" y="22" width="180" height="28" fill="#333545" rx="2"/><rect x="740" y="22" width="120" height="28" fill="#333545" rx="2"/><rect x="0" y="48" width="1000" height="4" fill="#E8E890" opacity=".5"/><rect y="355" width="1000" height="105" fill="#252D38"/><rect x="180" y="352" width="640" height="4" fill="#F5A623"/><rect x="180" y="352" width="640" height="108" fill="#F5A62312"/><ellipse cx="60" cy="295" rx="22" ry="28" fill="#404050"/><ellipse cx="940" cy="295" rx="22" ry="28" fill="#404050"/><rect x="60" y="267" width="880" height="56" fill="#555058"/><line x1="60" y1="275" x2="940" y2="275" stroke="#484050" stroke-width="2"/><line x1="60" y1="315" x2="940" y2="315" stroke="#484050" stroke-width="2"/><rect x="100" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="160" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="220" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="280" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="340" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="400" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="460" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="520" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="580" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="640" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="700" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="760" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="820" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="880" y="267" width="3" height="56" fill="#3A3845" opacity=".7"/><rect x="220" y="323" width="20" height="32" fill="#404050"/><rect x="760" y="323" width="20" height="32" fill="#404050"/><rect x="25" y="80" width="140" height="185" fill="#4A5565" rx="6"/><rect x="35" y="95" width="120" height="80" fill="#3A4555" rx="4"/><circle cx="70" cy="120" r="10" fill="#28A745"/><circle cx="70" cy="120" r="5" fill="#50D860"/><circle cx="100" cy="120" r="10" fill="#DC3545"/><circle cx="100" cy="120" r="5" fill="#FF5060"/><circle cx="130" cy="120" r="10" fill="#F5A623"/><circle cx="130" cy="120" r="5" fill="#FFD060"/><circle cx="95" cy="152" r="16" fill="#C82020"/><circle cx="95" cy="152" r="10" fill="#E03030"/><rect x="35" y="200" width="120" height="6" fill="#333545" rx="2"/><rect x="35" y="213" width="120" height="6" fill="#333545" rx="2"/><rect x="35" y="226" width="120" height="6" fill="#333545" rx="2"/><rect x="835" y="80" width="140" height="185" fill="#4A5565" rx="6"/><rect x="845" y="95" width="120" height="80" fill="#3A4555" rx="4"/><circle cx="880" cy="120" r="10" fill="#28A745"/><circle cx="880" cy="120" r="5" fill="#50D860"/><circle cx="910" cy="120" r="10" fill="#F5A623"/><circle cx="910" cy="120" r="5" fill="#FFD060"/><circle cx="940" cy="120" r="10" fill="#DC3545"/><circle cx="940" cy="120" r="5" fill="#FF5060"/><circle cx="905" cy="152" r="16" fill="#C82020"/><circle cx="905" cy="152" r="10" fill="#E03030"/><rect x="845" y="200" width="120" height="6" fill="#333545" rx="2"/><rect x="845" y="213" width="120" height="6" fill="#333545" rx="2"/><rect x="380" y="55" width="240" height="130" fill="#28303C" rx="6"/><rect x="390" y="65" width="220" height="100" fill="#303845" rx="4"/><rect x="398" y="73" width="96" height="60" fill="#0A1020" rx="3"/><rect x="402" y="77" width="88" height="52" fill="#002050" rx="2"/><polyline points="405,103 415,88 425,108 435,93 445,112 455,85 465,105 475,95 480,103" fill="none" stroke="#00C860" stroke-width="1.5"/><rect x="504" y="73" width="96" height="60" fill="#0A1020" rx="3"/><rect x="508" y="77" width="88" height="52" fill="#200020" rx="2"/><polyline points="512,95 520,108 530,88 540,103 548,90 558,106 568,95 575,103 580,95" fill="none" stroke="#FF4060" stroke-width="1.5"/><circle cx="420" cy="148" r="7" fill="#F5A623"/><circle cx="445" cy="148" r="7" fill="#28A745"/><circle cx="470" cy="148" r="7" fill="#DC3545"/><circle cx="495" cy="148" r="7" fill="#4870D0"/><circle cx="545" cy="148" r="7" fill="#F5A623"/><circle cx="570" cy="148" r="7" fill="#28A745"/></svg>`;}
+
+function bgOffice(){return`<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1000 460" preserveAspectRatio="xMidYMid slice"><rect width="1000" height="460" fill="#EAE5DC"/><rect y="0" width="1000" height="16" fill="#D8D0C4"/><rect y="16" width="1000" height="5" fill="#C8B8A0"/><rect x="738" y="30" width="230" height="220" fill="#90C0E0" rx="4"/><rect x="738" y="30" width="230" height="220" fill="none" stroke="#A8906A" stroke-width="8" rx="4"/><line x1="853" y1="30" x2="853" y2="250" stroke="#A8906A" stroke-width="4"/><line x1="738" y1="140" x2="968" y2="140" stroke="#A8906A" stroke-width="4"/><ellipse cx="850" cy="400" rx="120" ry="32" fill="rgba(255,255,200,.2)"/><rect x="30" y="35" width="190" height="135" fill="#F5F5F0" rx="4" stroke="#B0A890" stroke-width="5"/><rect x="30" y="35" width="190" height="14" fill="#D8D0C4" rx="4"/><line x1="50" y1="62" x2="200" y2="62" stroke="#90C090" stroke-width="1.5"/><line x1="50" y1="76" x2="200" y2="76" stroke="#C09080" stroke-width="1.5"/><line x1="50" y1="90" x2="185" y2="90" stroke="#8090C0" stroke-width="1.5"/><line x1="50" y1="104" x2="190" y2="104" stroke="#90C090" stroke-width="1.5"/><line x1="50" y1="118" x2="175" y2="118" stroke="#C09080" stroke-width="1.5"/><line x1="50" y1="132" x2="195" y2="132" stroke="#8090C0" stroke-width="1.5"/><rect x="30" y="170" width="190" height="10" fill="#C0B090" rx="2"/><rect x="52" y="170" width="18" height="8" fill="#E03030" rx="1"/><rect x="76" y="170" width="18" height="8" fill="#3050E0" rx="1"/><rect x="90" y="255" width="270" height="16" fill="#C09870" rx="3"/><rect x="90" y="271" width="8" height="85" fill="#A87848" rx="2"/><rect x="352" y="271" width="8" height="85" fill="#A87848" rx="2"/><rect x="158" y="185" width="110" height="70" fill="#2A2835" rx="4"/><rect x="163" y="190" width="100" height="60" fill="#1C3A6A" rx="3"/><polyline points="168,225 178,215 188,228 198,210 208,222 218,214 228,225 238,218 248,225 253,220" fill="none" stroke="#60E0A0" stroke-width="1.5"/><rect x="163" y="258" width="100" height="10" fill="#D8D0C4" rx="3" stroke="#C0B8A8" stroke-width="1"/><rect x="203" y="255" width="20" height="8" fill="#3A3548" rx="2"/><rect x="280" y="238" width="68" height="15" fill="#F8F0E0" rx="1" stroke="#E0D0B8" stroke-width="1"/><rect x="280" y="242" width="68" height="15" fill="#F0E8D8" rx="1" stroke="#E0D0B8" stroke-width="1" transform="rotate(3,314,249)"/><rect x="462" y="195" width="82" height="165" fill="#B0A898" rx="4"/><rect x="467" y="203" width="72" height="36" fill="#A09888" rx="3" stroke="#908878" stroke-width="1"/><rect x="467" y="244" width="72" height="36" fill="#A09888" rx="3" stroke="#908878" stroke-width="1"/><rect x="467" y="285" width="72" height="36" fill="#A09888" rx="3" stroke="#908878" stroke-width="1"/><rect x="467" y="326" width="72" height="28" fill="#A09888" rx="3" stroke="#908878" stroke-width="1"/><rect x="497" y="217" width="12" height="5" fill="#787070" rx="2"/><rect x="497" y="258" width="12" height="5" fill="#787070" rx="2"/><rect x="497" y="298" width="12" height="5" fill="#787070" rx="2"/><rect x="497" y="336" width="12" height="5" fill="#787070" rx="2"/><rect x="470" y="210" width="40" height="12" fill="#F0E8D8" rx="1"/><rect x="470" y="252" width="40" height="12" fill="#F0E8D8" rx="1"/><rect x="470" y="292" width="40" height="12" fill="#F0E8D8" rx="1"/><rect x="600" y="255" width="270" height="16" fill="#C09870" rx="3"/><rect x="600" y="271" width="8" height="85" fill="#A87848" rx="2"/><rect x="862" y="271" width="8" height="85" fill="#A87848" rx="2"/><rect x="678" y="185" width="110" height="70" fill="#2A2835" rx="4"/><rect x="683" y="190" width="100" height="60" fill="#1A2838" rx="3"/><rect x="688" y="196" width="90" height="8" fill="#304060" rx="1"/><rect x="688" y="210" width="60" height="6" fill="#284050" rx="1"/><rect x="688" y="222" width="75" height="6" fill="#284050" rx="1"/><rect x="688" y="234" width="50" height="6" fill="#284050" rx="1"/><rect x="683" y="258" width="100" height="10" fill="#D8D0C4" rx="3" stroke="#C0B8A8" stroke-width="1"/><rect x="793" y="190" width="26" height="24" fill="#F5E860" rx="1" transform="rotate(-5,806,202)"/><rect x="788" y="196" width="26" height="24" fill="#F8C0A0" rx="1" transform="rotate(4,801,208)"/><rect y="360" width="1000" height="100" fill="#C8B898"/><line x1="0" y1="360" x2="1000" y2="360" stroke="#B8A880" stroke-width="2"/><rect x="0" y="360" width="200" height="8" fill="#C0B090" rx="1"/><rect x="205" y="360" width="195" height="8" fill="#C8B898" rx="1"/><rect x="405" y="360" width="210" height="8" fill="#C0B090" rx="1"/><rect x="0" y="318" width="28" height="44" fill="#8A6A40" rx="2"/><ellipse cx="14" cy="314" rx="22" ry="28" fill="#3A8040"/><ellipse cx="5" cy="304" rx="14" ry="18" fill="#2A6830"/><ellipse cx="24" cy="307" rx="14" ry="18" fill="#2A6830"/></svg>`;}
+
+// ══════════════════════════════════════════════
+// AUDIO ENGINE — Web Audio API, zero dependencies
+// BGM: seamless generative loop
+// SFX: always plays, independent of BGM mute
+// ══════════════════════════════════════════════
+const AUD = (() => {
+  let ctx = null;
+  let bgmOn = true;
+  // BGM nodes kept alive for volume control
+  let bgmGain = null;
+  // Loop scheduling state
+  let loopStart = 0;
+  const LOOP_BARS = 8;   // musical bars per scheduled chunk
+  const BAR_BEATS = 4;
+  const BPM = 92;
+  const BEAT = 60 / BPM;
+  const BAR = BEAT * BAR_BEATS;
+  const LOOP_DUR = BAR * LOOP_BARS; // ~20.87 s — seamless crossfade at this boundary
+
+  // ── Context bootstrap (must be called from user gesture) ──────────
+  function boot() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    bgmGain = ctx.createGain();
+    bgmGain.gain.setValueAtTime(0.0, ctx.currentTime);  // fade in
+    bgmGain.gain.linearRampToValueAtTime(0.38, ctx.currentTime + 2.2);
+    bgmGain.connect(ctx.destination);
+    scheduleBGM(ctx.currentTime);
+    scheduleLoop();
+  }
+
+  // ── BGM: schedule a full loop chunk starting at `when` ───────────
+  function scheduleBGM(when) {
+    loopStart = when;
+    const end = when + LOOP_DUR;
+    makePad(when, end);
+    makeBass(when, end);
+    makePulse(when, end);
+    makeHihat(when, end);
+    makeChime(when, end);
+  }
+
+  // Re-schedule loop with crossfade at boundary
+  function scheduleLoop() {
+    if (!ctx) return;
+    const ahead = 0.25; // schedule 250 ms before boundary
+    const next = loopStart + LOOP_DUR;
+    const wait = Math.max(10, (next - ahead - ctx.currentTime) * 1000);
+    setTimeout(() => {
+      if (!ctx) return;
+      const xfadeWhen = loopStart + LOOP_DUR - 0.08;
+      // Brief micro-crossfade: drop then restore
+      if (bgmGain && bgmOn) {
+        bgmGain.gain.setValueAtTime(0.38, xfadeWhen);
+        bgmGain.gain.linearRampToValueAtTime(0.35, xfadeWhen + 0.04);
+        bgmGain.gain.linearRampToValueAtTime(0.38, xfadeWhen + 0.12);
+      }
+      scheduleBGM(loopStart + LOOP_DUR);
+      scheduleLoop();
+    }, wait);
+  }
+
+  // ── LAYER BUILDERS ────────────────────────────────────────────────
+
+  // 1. Warm pad — two detuned saws through lowpass, gentle swell
+  function makePad(t, end) {
+    const notes = [130.81, 164.81, 196.00, 261.63]; // C3 E3 G3 C4
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      const filt= ctx.createBiquadFilter();
+      osc.type = 'sawtooth';
+      osc.frequency.value = freq * (1 + (i % 2 === 0 ? 0.003 : -0.004));
+      filt.type = 'lowpass';
+      filt.frequency.value = 480;
+      filt.Q.value = 1.4;
+      // Swell every 2 bars
+      const swellBar = BAR * 2;
+      for (let b = t; b < end; b += swellBar) {
+        g.gain.setValueAtTime(0.0, b);
+        g.gain.linearRampToValueAtTime(0.06, b + swellBar * 0.4);
+        g.gain.linearRampToValueAtTime(0.03, b + swellBar * 0.85);
+        g.gain.linearRampToValueAtTime(0.0, b + swellBar * 0.98);
+      }
+      osc.connect(filt); filt.connect(g); g.connect(bgmGain);
+      osc.start(t); osc.stop(end + 0.1);
+    });
+  }
+
+  // 2. Bass line — sine sub, rhythmic pattern over 2-bar phrase
+  function makeBass(t, end) {
+    // Pattern: beat offsets and root pitches (C2/G2 alternation)
+    const pattern = [
+      {b:0.0,f:65.41},{b:1.0,f:65.41},{b:1.5,f:65.41},
+      {b:2.0,f:98.00},{b:3.0,f:65.41},{b:3.75,f:65.41}
+    ];
+    const phrase = BAR * 2;
+    for (let p = t; p < end; p += phrase) {
+      pattern.forEach(({b, f}) => {
+        const hit = p + b * BEAT;
+        if (hit >= end) return;
+        const osc = ctx.createOscillator();
+        const g   = ctx.createGain();
+        const dur = BEAT * 0.45;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, hit);
+        g.gain.setValueAtTime(0.0, hit);
+        g.gain.linearRampToValueAtTime(0.22, hit + 0.018);
+        g.gain.exponentialRampToValueAtTime(0.001, hit + dur);
+        osc.connect(g); g.connect(bgmGain);
+        osc.start(hit); osc.stop(hit + dur + 0.05);
+      });
+    }
+  }
+
+  // 3. Industrial pulse / kick-like thud (filtered noise + sine click)
+  function makePulse(t, end) {
+    // Kick on beat 1 and 3 of every bar
+    for (let bar = 0; bar < LOOP_BARS; bar++) {
+      [0, 2].forEach(beat => {
+        const hit = t + bar * BAR + beat * BEAT;
+        if (hit >= end) return;
+        // Sine sweep (body)
+        const osc = ctx.createOscillator();
+        const g   = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, hit);
+        osc.frequency.exponentialRampToValueAtTime(48, hit + 0.12);
+        g.gain.setValueAtTime(0.0, hit);
+        g.gain.linearRampToValueAtTime(0.38, hit + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.001, hit + 0.18);
+        osc.connect(g); g.connect(bgmGain);
+        osc.start(hit); osc.stop(hit + 0.22);
+        // Noise click (transient)
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+        const src = ctx.createBufferSource();
+        const flt = ctx.createBiquadFilter();
+        const ng  = ctx.createGain();
+        src.buffer = buf;
+        flt.type = 'bandpass'; flt.frequency.value = 200; flt.Q.value = 0.7;
+        ng.gain.setValueAtTime(0.14, hit);
+        ng.gain.exponentialRampToValueAtTime(0.001, hit + 0.038);
+        src.connect(flt); flt.connect(ng); ng.connect(bgmGain);
+        src.start(hit);
+      });
+    }
+  }
+
+  // 4. Hi-hat — filtered noise on every 8th note
+  function makeHihat(t, end) {
+    const step = BEAT / 2;
+    for (let i = 0; i < LOOP_BARS * BAR_BEATS * 2; i++) {
+      const hit = t + i * step;
+      if (hit >= end) return;
+      const isDown = i % 4 === 0;
+      const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.055), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let j = 0; j < d.length; j++) d[j] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      const flt = ctx.createBiquadFilter();
+      const g   = ctx.createGain();
+      src.buffer = buf;
+      flt.type = 'highpass'; flt.frequency.value = isDown ? 7000 : 9000;
+      const vol = isDown ? 0.045 : 0.018;
+      g.gain.setValueAtTime(vol, hit);
+      g.gain.exponentialRampToValueAtTime(0.001, hit + 0.052);
+      src.connect(flt); flt.connect(g); g.connect(bgmGain);
+      src.start(hit);
+    }
+  }
+
+  // 5. Chime melody — pentatonic C major, brightens the loop
+  function makeChime(t, end) {
+    // C4 D4 E4 G4 A4 pentatonic
+    const scale = [261.63, 293.66, 329.63, 392.00, 440.00];
+    // Fixed melodic phrase over 4 bars, repeat twice
+    const phrase = [
+      {b:0.0,n:0},{b:1.0,n:2},{b:1.5,n:4},{b:2.0,n:3},
+      {b:3.0,n:1},{b:3.5,n:0},{b:4.0,n:4},{b:5.0,n:3},
+      {b:6.0,n:2},{b:6.5,n:4},{b:7.0,n:0},{b:7.5,n:1}
+    ];
+    for (let rep = 0; rep < 2; rep++) {
+      const off = t + rep * BAR * 4;
+      phrase.forEach(({b, n}) => {
+        const hit = off + b * BEAT;
+        if (hit >= end) return;
+        const osc = ctx.createOscillator();
+        const g   = ctx.createGain();
+        const flt = ctx.createBiquadFilter();
+        osc.type = 'triangle';
+        osc.frequency.value = scale[n] * (1 + (Math.random() - 0.5) * 0.002);
+        flt.type = 'lowpass'; flt.frequency.value = 2200;
+        const dur = BEAT * 0.6;
+        g.gain.setValueAtTime(0.0, hit);
+        g.gain.linearRampToValueAtTime(0.055, hit + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, hit + dur);
+        osc.connect(flt); flt.connect(g); g.connect(bgmGain);
+        osc.start(hit); osc.stop(hit + dur + 0.05);
+      });
+    }
+  }
+
+  // ── BGM TOGGLE ────────────────────────────────────────────────────
+  function toggle() {
+    if (!ctx) { boot(); return; }
+    bgmOn = !bgmOn;
+    const now = ctx.currentTime;
+    if (bgmOn) {
+      bgmGain.gain.cancelScheduledValues(now);
+      bgmGain.gain.setValueAtTime(bgmGain.gain.value, now);
+      bgmGain.gain.linearRampToValueAtTime(0.38, now + 0.6);
+    } else {
+      bgmGain.gain.cancelScheduledValues(now);
+      bgmGain.gain.setValueAtTime(bgmGain.gain.value, now);
+      bgmGain.gain.linearRampToValueAtTime(0.0, now + 0.5);
+    }
+    // Update icon
+    $('bgm-on-ico').classList.toggle('hidden', !bgmOn);
+    $('bgm-off-ico').classList.toggle('hidden', bgmOn);
+    $('bgm-btn').style.background = bgmOn ? '#253545' : '#1a1a2e';
+  }
+
+  // ── SFX HELPERS ───────────────────────────────────────────────────
+  function getCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      bgmGain = ctx.createGain(); bgmGain.gain.value = 0; bgmGain.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function sfxTone(freq, type, dur, vol, ramp, dest) {
+    const c = getCtx();
+    dest = dest || c.destination;
+    const osc = c.createOscillator();
+    const g   = c.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    osc.connect(g); g.connect(dest);
+    osc.start(c.currentTime); osc.stop(c.currentTime + dur + 0.02);
+    if (ramp) osc.frequency.exponentialRampToValueAtTime(ramp, c.currentTime + dur);
+  }
+
+  function sfxNoise(dur, vol, lofreq, hifreq, dest) {
+    const c = getCtx();
+    dest = dest || c.destination;
+    const len = Math.ceil(c.sampleRate * dur);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    const flt = c.createBiquadFilter();
+    const g   = c.createGain();
+    src.buffer = buf;
+    flt.type = 'bandpass';
+    flt.frequency.value = (lofreq + hifreq) / 2;
+    flt.Q.value = (lofreq + hifreq) / Math.max(1, hifreq - lofreq);
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    src.connect(flt); flt.connect(g); g.connect(dest);
+    src.start(c.currentTime);
+  }
+
+  // ── PUBLIC SFX ────────────────────────────────────────────────────
+  // All SFX route directly to ctx.destination, bypassing bgmGain (always audible)
+
+  function sfxCorrect() {
+    // Bright ascending chime: C5→E5→G5
+    const c = getCtx(); const d = c.destination;
+    [[523.25,0],[659.25,.08],[784.00,.16]].forEach(([f,delay]) => {
+      setTimeout(()=>sfxTone(f,'triangle',.35,.22,f*0.5,d), delay*1000);
+    });
+  }
+
+  function sfxWrong() {
+    const c = getCtx(); const d = c.destination;
+    // Dissonant descending pair
+    sfxTone(220,'square',.18,.14,130,d);
+    setTimeout(()=>sfxTone(180,'square',.22,.1,110,d), 90);
+  }
+
+  function sfxFlip() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(600,'sine',.08,.12,900,d);
+  }
+
+  function sfxMatch() {
+    // Satisfying "ding ding"
+    const c = getCtx(); const d = c.destination;
+    sfxTone(880,'triangle',.25,.18,660,d);
+    setTimeout(()=>sfxTone(1047,'triangle',.3,.14,880,d), 120);
+  }
+
+  function sfxNoMatch() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(160,'sawtooth',.2,.12,100,d);
+  }
+
+  function sfxBin() {
+    // Hollow thud of rubbish in bin
+    const c = getCtx(); const d = c.destination;
+    sfxTone(110,'sine',.18,.28,55,d);
+    sfxNoise(.12,.16,300,900,d);
+  }
+
+  function sfxMiss() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(250,'sawtooth',.14,.1,180,d);
+  }
+
+  function sfxWrongBin() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(200,'square',.2,.12,130,d);
+    setTimeout(()=>sfxTone(160,'square',.18,.08,110,d),80);
+  }
+
+  function sfxFound() {
+    // Discovery sparkle
+    const c = getCtx(); const d = c.destination;
+    [1046.5,1318.5,1568].forEach((f,i)=>{
+      setTimeout(()=>sfxTone(f,'triangle',.22,.16,f*1.12,d), i*60);
+    });
+  }
+
+  function sfxTrap() {
+    // Sharp buzz
+    const c = getCtx(); const d = c.destination;
+    sfxNoise(.18,.22,600,1800,d);
+    sfxTone(130,'square',.18,.14,80,d);
+  }
+
+  function sfxHint() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(740,'sine',.15,.12,580,d);
+    setTimeout(()=>sfxTone(880,'sine',.2,.1,740,d), 120);
+  }
+
+  function sfxLevelUp() {
+    // Ascending fanfare
+    const c = getCtx(); const d = c.destination;
+    const seq = [523.25,659.25,784,1046.5];
+    seq.forEach((f,i)=>setTimeout(()=>sfxTone(f,'triangle',.35,.2,f,d), i*110));
+  }
+
+  function sfxHeartLost() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(440,'sawtooth',.08,.18,220,d);
+    setTimeout(()=>sfxTone(220,'sawtooth',.3,.16,110,d),80);
+    setTimeout(()=>sfxNoise(.2,.1,200,600,d),160);
+  }
+
+  function sfxClick() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(800,'sine',.06,.09,600,d);
+  }
+
+  function sfxVictory() {
+    // 8-note win fanfare C E G C' E' G' E' C''
+    const c = getCtx(); const d = c.destination;
+    const mel=[261.63,329.63,392,523.25,659.25,784,659.25,1046.5];
+    mel.forEach((f,i)=>setTimeout(()=>{
+      sfxTone(f,'triangle',.3,.24,f,d);
+      if(i===mel.length-1) setTimeout(()=>sfxTone(f*2,'triangle',.5,.2,f*2,d),150);
+    }, i*130));
+  }
+
+  function sfxGameOver() {
+    const c = getCtx(); const d = c.destination;
+    const mel=[392,349.23,311.13,261.63];
+    mel.forEach((f,i)=>setTimeout(()=>sfxTone(f,'sawtooth',.35,.18,f*.85,d), i*180));
+  }
+
+  function sfxScenarioRight() {
+    // Quiz correct: two-tone positive
+    const c = getCtx(); const d = c.destination;
+    sfxTone(659.25,'triangle',.2,.18,523.25,d);
+    setTimeout(()=>sfxTone(880,'triangle',.28,.16,740,d),150);
+  }
+
+  function sfxScenarioWrong() {
+    const c = getCtx(); const d = c.destination;
+    sfxTone(311.13,'square',.25,.12,220,d);
+  }
+
+  function sfxDrag() {
+    const c = getCtx(); const d = c.destination;
+    sfxNoise(.04,.06,1200,3000,d);
+  }
+
+  return {
+    boot, toggle,
+    sfxCorrect, sfxWrong, sfxFlip, sfxMatch, sfxNoMatch,
+    sfxBin, sfxMiss, sfxWrongBin, sfxFound, sfxTrap,
+    sfxHint, sfxLevelUp, sfxHeartLost, sfxClick,
+    sfxVictory, sfxGameOver, sfxScenarioRight, sfxScenarioWrong,
+    sfxDrag
+  };
+})();
+
+// Expose toggle for button
+function toggleBGM() { AUD.toggle(); }
+</script>
+</body>
+</html>
